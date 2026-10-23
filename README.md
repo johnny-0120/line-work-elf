@@ -6,7 +6,7 @@
 
 這是可自行部署的個人助理原型。你需要自己的 LINE 官方帳號、OpenRouter key，以及選用的 Google OAuth 憑證；本倉庫不包含作者的帳號、訊息、資料庫或筆記。
 
-[閱讀完整 12 頁介紹](docs/presentation/README.md) · [下載可編輯簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23/line-work-elf-introduction.pptx)
+[10 頁圖文介紹](docs/presentation/README.md) · [使用教學與問題排查](docs/usage.md) · [系統與資料流程](docs/architecture.md) · [下載簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-10pages/line-work-elf-introduction-10pages.pptx)
 
 ## 群組聊過的事，整理後接著做
 
@@ -20,11 +20,24 @@
 
 私訊不用先加「公事：」。工作紀錄、筆記問題與日曆要求會交給對應工具，缺資訊時先追問。Obsidian 採關鍵字搜尋相關 Markdown 片段，回答附筆記名稱與原文，讓問題接得上自己的專案背景。
 
-![Obsidian 背景問答方式](docs/presentation/slides/08.png)
+![Obsidian 背景問答方式](docs/presentation/slides/07.png)
 
 日曆會區分明確安排與暫定想法。時間不完整就追問，暫定安排先確認，操作後依工具回傳告知結果。目前行程查詢與空閒檢查已驗證，真實新增活動仍待補測。
 
-![明確行程與暫定想法的情境示範](docs/presentation/slides/07.png)
+![明確行程與暫定想法的情境示範](docs/presentation/slides/06.png)
+
+## 部署完成後，先試這一輪
+
+先完成下方安裝與 Webhook 設定。這個倉庫提供自架原始碼，目前沒有公用的免安裝機器人服務。
+
+1. 邀請自己的小精靈加入工作群，私訊 `/綁定群組`，把取得的一次性指令貼進正確群組並依提示啟用。
+2. 群內傳「測試：活動文案週五下午三點交，請我確認場地」，再私訊小精靈 `/整理`。
+3. 核對摘要有沒有保留期限與原文依據，用 `/待回覆` 查看事項，處理好再傳 `/已處理 編號`。
+4. 私訊「今天有什麼行程？」或「參考我的筆記，整理競賽準備重點」，測試已連接的日曆與筆記工具。
+
+![摘要與待回覆的操作方式](docs/presentation/slides/05.png)
+
+群組啟用後的新文字會自動收集，不必逐句加「公事」。私訊也能直接說需求。收到受理訊息後，仍要確認最終摘要或工具結果。[完整教學](docs/usage.md) 包含預期結果與失敗時的檢查方式。
 
 ## 能做什麼
 
@@ -38,6 +51,25 @@
 公開的是自有 Python 程式與 n8n 工作流。n8n 保留 Webhook、摘要排程、AI Agent 與 HTTP 流程；私訊工具、背景檢索、證據檢查與日曆操作在 Python 服務執行。
 
 ![系統分工示意](docs/images/architecture.png)
+
+### n8n 與 Agent 怎麼合作
+
+```mermaid
+flowchart LR
+    line[LINE 新文字] --> relay[受限 Webhook 入口]
+    relay --> n8n[n8n Webhook]
+    n8n --> service[Python 簽章與來源檢查]
+    service --> groups[啟用群組的公事資料]
+    service --> dm[擁有者私訊意圖]
+    groups --> digest[n8n 摘要 AI Agent]
+    timer[21:00 或手動整理] --> digest
+    digest --> evidence[原文依據檢查]
+    evidence --> reply[LINE 私訊結果]
+    dm --> tools[待辦／筆記／Calendar 工具]
+    tools --> reply
+```
+
+圖中顯示邏輯分工，實際元件與資料位置見[系統說明](docs/architecture.md)。摘要由 n8n AI Agent 處理，私訊工具在 Python 執行，兩者使用同一套工作資料。
 
 ## 開始前
 
