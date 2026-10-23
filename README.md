@@ -6,7 +6,7 @@
 
 這是可自行部署的個人助理原型。你需要自己的 LINE 官方帳號、OpenRouter key，以及選用的 Google OAuth 憑證；本倉庫不包含作者的帳號、訊息、資料庫或筆記。
 
-[10 頁圖文介紹](docs/presentation/README.md) · [使用教學與問題排查](docs/usage.md) · [系統與資料流程](docs/architecture.md) · [下載簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-10pages/line-work-elf-introduction-10pages.pptx)
+[10 頁圖文介紹](docs/presentation/README.md) · [使用教學與問題排查](docs/usage.md) · [系統與資料流程](docs/architecture.md) · [下載簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-visual/line-work-elf-illustrated-10pages.pptx)
 
 ## 群組聊過的事，整理後接著做
 
@@ -53,21 +53,6 @@
 ![系統分工示意](docs/images/architecture.png)
 
 ### n8n 與 Agent 怎麼合作
-
-```mermaid
-flowchart LR
-    line[LINE 新文字] --> relay[受限 Webhook 入口]
-    relay --> n8n[n8n Webhook]
-    n8n --> service[Python 簽章與來源檢查]
-    service --> groups[啟用群組的公事資料]
-    service --> dm[擁有者私訊意圖]
-    groups --> digest[n8n 摘要 AI Agent]
-    timer[21:00 或手動整理] --> digest
-    digest --> evidence[原文依據檢查]
-    evidence --> reply[LINE 私訊結果]
-    dm --> tools[待辦／筆記／Calendar 工具]
-    tools --> reply
-```
 
 圖中顯示邏輯分工，實際元件與資料位置見[系統說明](docs/architecture.md)。摘要由 n8n AI Agent 處理，私訊工具在 Python 執行，兩者使用同一套工作資料。
 

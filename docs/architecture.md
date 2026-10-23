@@ -6,25 +6,7 @@
 
 以下是邏輯流程，不是完整 n8n 節點截圖。LINE 事件先進入受限 relay，再由 n8n Webhook 交給 Python `/ingest` 處理簽章、來源與擁有者判斷。
 
-```mermaid
-flowchart TD
-    L[LINE 新事件] --> R[8790 relay 指定 Webhook]
-    R --> N[5678 n8n Webhook]
-    N --> I[8787 Python ingest]
-    I --> V{簽章與來源檢查}
-    V --> G[已綁定啟用的工作群組]
-    G --> DB[(本機 SQLite)]
-    V --> O[擁有者私訊]
-    O --> A[意圖判斷與近期脈絡]
-    A --> T[待辦／筆記／Calendar 工具]
-    S[21:00 或手動整理] --> P[n8n 取得待整理內容]
-    DB --> P
-    P --> M[摘要 AI Agent]
-    M --> E[格式與原文依據檢查]
-    E --> D[保存摘要與待辦]
-    D --> U[私訊擁有者]
-    T --> U
-```
+![系統分工與工具](presentation/slides/08.png)
 
 `workflow.json` 包含 Webhook、摘要排程、AI Agent 與 HTTP 節點。安裝腳本會轉成本機服務網址，不要直接把模板中的 `http://elf:8787` 當作 Windows 可用網址。
 
@@ -41,16 +23,7 @@ flowchart TD
 
 ## 哪些資料會離開電腦
 
-```mermaid
-flowchart LR
-    C[對話與近期前文] --> Q[選擇需要分析的內容]
-    B[相關筆記片段] --> Q
-    Q --> OR[OpenRouter 與模型供應方]
-    OR --> RE[分析結果]
-    RE --> LOCAL[本機檢查與保存]
-    LOCAL --> LINE[LINE 私訊結果]
-    AU[自己的 Google OAuth 授權] --> GC[Calendar 查詢或新增]
-```
+![本機與外部服務的資料範圍](presentation/slides/09.png)
 
 資料庫存本機，不表示分析都在本機執行。`私事`、`#private` 等明確規則先排除，其餘 AI 分類可能誤判。群組成員應了解用途，筆記也需標記或排除不適合送出的內容。
 

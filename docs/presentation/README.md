@@ -1,6 +1,6 @@
 # 公事小精靈：10 頁圖文介紹
 
-[下載可編輯 PowerPoint](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-10pages/line-work-elf-introduction-10pages.pptx) · [使用教學](../usage.md) · [安裝說明](../../README.md#開始前)
+[下載可編輯 PowerPoint](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-visual/line-work-elf-illustrated-10pages.pptx) · [使用教學](../usage.md) · [安裝說明](../../README.md#開始前)
 
 本介紹說明工具用途、互動方式、資料範圍與目前驗證狀態。對話與摘要均為合成情境示範，並非真實聊天紀錄。簡報文字可編輯，背景為 AI 生成的裝飾圖像。
 
