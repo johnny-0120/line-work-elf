@@ -1,10 +1,30 @@
 # 公事小精靈｜LINE Work Elf
 
-群組繼續聊，我先拿重點。用 LINE、n8n 與 OpenRouter 免費模型，整理工作訊息、追蹤待回覆，並參考自己的 Obsidian 筆記回答問題。
+群組聊完了，誰還記得我要做什麼？用 LINE、n8n 與 OpenRouter 免費模型，整理工作訊息、追蹤待回覆，並參考自己的 Obsidian 筆記回答問題。
 
-![公事小精靈工具介紹](docs/images/cover.png)
+![公事小精靈工具介紹](docs/presentation/slides/01.png)
 
 這是可自行部署的個人助理原型。你需要自己的 LINE 官方帳號、OpenRouter key，以及選用的 Google OAuth 憑證；本倉庫不包含作者的帳號、訊息、資料庫或筆記。
+
+[閱讀完整 12 頁介紹](docs/presentation/README.md) · [下載可編輯簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23/line-work-elf-introduction.pptx)
+
+## 群組聊過的事，整理後接著做
+
+交件期限、改時間與「可以幫忙確認嗎」常出現在不同訊息裡。小精靈接收已綁定工作來源的新文字，整理成公事重點與可能需要回覆的事項，附原文依據讓你核對。每天台北時間 21:00 已設定私訊摘要，也能傳 `/整理` 提前查看。
+
+![群組原文與整理結果的情境示範](docs/presentation/slides/02.png)
+
+上圖的對話與輸出是合成示範，沒有使用私人聊天紀錄。待辦完成後可用 `/已處理 編號` 標記；它無法知道你是否已在其他地方回覆。
+
+## 直接說需求，讓它選工具
+
+私訊不用先加「公事：」。工作紀錄、筆記問題與日曆要求會交給對應工具，缺資訊時先追問。Obsidian 採關鍵字搜尋相關 Markdown 片段，回答附筆記名稱與原文，讓問題接得上自己的專案背景。
+
+![Obsidian 背景問答方式](docs/presentation/slides/08.png)
+
+日曆會區分明確安排與暫定想法。時間不完整就追問，暫定安排先確認，操作後依工具回傳告知結果。目前行程查詢與空閒檢查已驗證，真實新增活動仍待補測。
+
+![明確行程與暫定想法的情境示範](docs/presentation/slides/07.png)
 
 ## 能做什麼
 
