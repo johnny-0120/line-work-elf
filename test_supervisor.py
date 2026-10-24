@@ -38,6 +38,15 @@ class SupervisorTests(unittest.TestCase):
         backup=sqlite3.connect(backups[0].parent/'elf.sqlite3')
         self.assertEqual(backup.execute('SELECT value FROM proof').fetchone()[0],42);backup.close()
 
+    def test_member_backups_stay_in_separate_files(self):
+        member=self.state/'members'/('a'*64+'.sqlite3')
+        member.parent.mkdir()
+        db=sqlite3.connect(member);db.execute('CREATE TABLE proof(value INTEGER)');db.execute('INSERT INTO proof VALUES(7)');db.commit();db.close()
+        s.backup_daily()
+        copies=list((self.state/'backups').glob('*/members/*.sqlite3'))
+        self.assertEqual(len(copies),1)
+        db=sqlite3.connect(copies[0]);self.assertEqual(db.execute('SELECT value FROM proof').fetchone()[0],7);db.close()
+
     def test_missed_digest_requested_once(self):
         now=datetime(2026,10,21,9,tzinfo=s.TZ);self.seed(now-timedelta(hours=15))
         checked=s.request_missed_digest(now,'');self.assertEqual(checked,'2026-10-20')

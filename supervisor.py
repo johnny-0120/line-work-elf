@@ -77,9 +77,13 @@ def backup_daily():
     if (target / 'complete.json').exists():
         return
     target.mkdir(exist_ok=True)
-    for name, path in [('elf.sqlite3', STATE/'elf.sqlite3'),
-                       ('n8n.sqlite3', STATE/'.n8n/database.sqlite')]:
+    databases=[('elf.sqlite3', STATE/'elf.sqlite3'),('n8n.sqlite3', STATE/'.n8n/database.sqlite')]
+    for path in (STATE/'members').glob('*.sqlite3'):
+        if not path.is_symlink() and re.fullmatch(r'[0-9a-f]{64}\.sqlite3',path.name):
+            databases.append(('members/'+path.name,path))
+    for name, path in databases:
         if path.exists():
+            (target/name).parent.mkdir(parents=True,exist_ok=True)
             src = sqlite3.connect(path, timeout=10)
             dst = sqlite3.connect(target/name)
             try:

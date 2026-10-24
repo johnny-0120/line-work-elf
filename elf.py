@@ -1,7 +1,7 @@
 """LINE work digest storage, validation and free-only OpenRouter gateway.
 
-Python 3.10+, standard library only. All outbound messages go to the owner
-except command replies such as /我的ID and group setup acknowledgements.
+Python 3.10+, standard library only. Personal tools remain owner-only;
+opt-in public group digests use isolated member databases and recipients.
 """
 import base64
 import hashlib
@@ -103,8 +103,10 @@ def http_json(url, body, headers):
 
 
 class Elf:
-    def __init__(self, db_path=None, sender=None, asynchronous=False):
+    def __init__(self, db_path=None, sender=None, asynchronous=False, owner_id=None, member=False):
         self.lock = threading.RLock()
+        self.owner_id = os.getenv('LINE_OWNER_USER_ID', '') if owner_id is None else owner_id
+        self.public = None
         path = db_path or os.getenv('ELF_DB', str(ROOT / 'data/elf.sqlite3'))
         if path != ':memory:':
             Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -150,6 +152,10 @@ class Elf:
         self.db.execute('INSERT OR IGNORE INTO known_groups(id,name,owner_seen,present,created) SELECT id,name,1,1,? FROM sources WHERE id!=?', (time.time(),os.getenv('LINE_OWNER_USER_ID','')))
         self.db.commit()
 
+        if not member and os.getenv('PUBLIC_GROUPS_ENABLED','0') == '1':
+            from public_groups import PublicGroups
+            self.public = PublicGroups(self, path)
+
     def audit_event(self, event, payload_hash, verified, disposition, fallback_id=''):
         source=event.get('source',{})
         kind=source.get('type','unknown')
@@ -164,7 +170,7 @@ class Elf:
         self.db.execute('INSERT OR IGNORE INTO event_audit VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
             (eid,payload_hash,kind,ref,event.get('type','unknown'),stamp,now,now,0,int(verified),
              int(bool(event.get('deliveryContext',{}).get('isRedelivery'))),disposition,
-             int(bool(os.getenv('LINE_OWNER_USER_ID') and source.get('userId')==os.getenv('LINE_OWNER_USER_ID')))))
+             int(bool(self.owner_id and source.get('userId')==self.owner_id))))
         self.db.execute('UPDATE event_audit SET last_received=?,deliveries=deliveries+1,redelivery=MAX(redelivery,?) WHERE event_id=? AND payload_hash=?',
             (now,int(bool(event.get('deliveryContext',{}).get('isRedelivery'))),eid,payload_hash))
 
@@ -180,7 +186,7 @@ class Elf:
             payload = {'replyToken': reply_token, 'messages': [{'type': 'text', 'text': body[:4800]}]}
         else:
             endpoint = 'push'
-            owner = os.getenv('LINE_OWNER_USER_ID', '')
+            owner = self.owner_id
             if not owner:
                 raise Problem(503, 'LINE_OWNER_USER_ID is not configured.')
             payload = {'to': owner, 'messages': [{'type': 'text', 'text': body[:4800]}]}
@@ -212,6 +218,8 @@ class Elf:
             raise Problem(401,'LINE destination does not match this bot.')
         trigger = False
         with self.lock:
+            if self.public:
+                trigger = self.public.ingest(payload)
             for index,event in enumerate(payload.get('events', [])):
                 eid = event.get('webhookEventId')
                 if not eid:
@@ -229,15 +237,15 @@ class Elf:
                     # Resume a failed immediate-digest execution if necessary.
                     trigger = trigger or bool(self.db.execute("SELECT 1 FROM jobs WHERE state='pending'").fetchone())
                     retry_source = event.get('source', {})
-                    trigger = trigger or bool(os.getenv('LINE_OWNER_USER_ID') and
-                        retry_source.get('userId') == os.getenv('LINE_OWNER_USER_ID') and
+                    trigger = trigger or bool(self.owner_id and
+                        retry_source.get('userId') == self.owner_id and
                         retry_source.get('type') == 'user' and
                         event.get('message', {}).get('text', '').strip() in ('/整理', '/立即整理') and self.has_pending_content())
                     continue
                 source = event.get('source', {})
                 sid = source[key]
                 uid = source.get('userId', '')
-                owner = os.getenv('LINE_OWNER_USER_ID', '')
+                owner = self.owner_id
                 if self.db.execute('SELECT 1 FROM blocked_sources WHERE id=?',(sid,)).fetchone():
                     self.audit_event(event,payload_hash,verified,'blocked_source')
                     self.db.execute('INSERT OR IGNORE INTO events VALUES(?,?)',(eid,time.time()))
@@ -327,7 +335,7 @@ class Elf:
         self.db.execute('DELETE FROM tasks WHERE source=?', (sid,))
         self.db.execute('DELETE FROM sources WHERE id=?', (sid,))
         self.erase_snapshots(source_id=sid)
-        if sid == os.getenv('LINE_OWNER_USER_ID'):
+        if sid == self.owner_id:
             self.db.execute('DELETE FROM assistant_jobs')
             self.db.execute('DELETE FROM assistant_context')
             self.db.execute('DELETE FROM proposals')
@@ -500,6 +508,8 @@ class Elf:
 
     def recover(self):
         with self.lock:
+            if self.public and self.public.ready():
+                return {'run': True}
             after = self.db.execute("SELECT value FROM controls WHERE id='retry_after'").fetchone()
             if after and after[0] > time.time():
                 return {'run': False}
@@ -522,6 +532,8 @@ class Elf:
             self.db.commit()
 
     def failed(self, jid, reason=''):
+        if self.public and jid.startswith('mt:'):
+            return self.public.dispatch('failed', jid, reason)
         self.operation_audit('n8n_digest','failed',reason)
         with self.lock:
             job = self.db.execute("SELECT id FROM jobs WHERE id=? AND state='pending'", (jid,)).fetchone()
@@ -539,6 +551,8 @@ class Elf:
             return {'run': False, 'retained': bool(job)}
 
     def background_once(self):
+        if self.public:
+            self.public.background_once()
         # Network calls run outside the database lock, so LINE webhooks stay fast.
         from calendar_client import GoogleCalendar, CalendarError
         from calendar_actions import execute
@@ -589,7 +603,7 @@ class Elf:
             time.sleep(2)
 
     def prepare(self):
-        if not os.getenv('LINE_OWNER_USER_ID'):
+        if not self.owner_id:
             raise Problem(503, 'Set LINE_OWNER_USER_ID before preparing a digest.')
         with self.lock:
             self.prune()
@@ -608,6 +622,8 @@ class Elf:
                 if not self.db.execute("SELECT 1 FROM assistant_jobs WHERE state='pending' LIMIT 1").fetchone():
                     self.db.execute("INSERT OR REPLACE INTO controls VALUES('digest_requested',0)")
                 self.db.commit()
+                if self.public:
+                    return self.public.prepare()
                 return {'run': False}
             jid = str(uuid.uuid4())
             self.db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?)', (jid, json.dumps(items, ensure_ascii=False), 'pending', str(uuid.uuid4()), None, time.time()))
@@ -622,13 +638,15 @@ class Elf:
         pending_ids = {m['id'] for m in pending}
         context = [m for m in context if m['id'] not in pending_ids]
         background = search_notes('\n'.join(m['text'] for m in (context+pending)[-8:]))
-        data = {'owner_id': os.getenv('LINE_OWNER_USER_ID'),
+        data = {'owner_id': self.owner_id,
                 'owner_names': [name.strip() for name in os.getenv('LINE_OWNER_NAMES', '').split(',') if name.strip()],
                 'now': datetime.now(TAIPEI).isoformat(),
                 'messages': pending, 'recent_context': context, 'background': background}
         return {'run': True, 'job_id': job['id'], 'system': SYSTEM, 'prompt': json.dumps(data, ensure_ascii=False)}
 
     def deliver(self, jid, output):
+        if self.public and jid.startswith('mt:'):
+            return self.public.dispatch('deliver', jid, output)
         with self.lock:
             job = self.db.execute('SELECT * FROM jobs WHERE id=?', (jid,)).fetchone()
             if not job:
@@ -707,9 +725,11 @@ class Elf:
             if not more and not self.db.execute("SELECT 1 FROM assistant_jobs WHERE state='pending' LIMIT 1").fetchone():
                 self.db.execute("INSERT OR REPLACE INTO controls VALUES('digest_requested',0)")
             self.db.commit()
-            return {'sent': True, 'items_processed': len(originals), 'run': more}
+            return {'sent': True, 'items_processed': len(originals), 'run': more or bool(self.public and self.public.ready())}
 
     def retry_digest(self, jid):
+        if self.public and jid.startswith('mt:'):
+            return self.public.dispatch('retry_digest', jid)
         with self.lock:
             job=self.db.execute("SELECT * FROM jobs WHERE id=? AND state='pending'",(jid,)).fetchone()
             if not job:
@@ -751,6 +771,8 @@ class Elf:
         route_retried = compat_retried = False
         for attempt in range(3):
             try:
+                if self.public:
+                    self.public.reserve_model_call(body)
                 result=self.send('https://openrouter.ai/api/v1/chat/completions',allowed,
                                  {'Authorization':'Bearer '+key,'X-Title':'LINE Work Elf'})
                 break
@@ -812,7 +834,8 @@ class Handler(BaseHTTPRequestHandler):
                 tables=('events','messages','tasks','jobs','outbox','assistant_jobs','group_bindings')
                 counts={t:self.elf.db.execute('SELECT count(*) FROM '+t).fetchone()[0] for t in tables}
                 counts['pending_messages']=self.elf.db.execute('SELECT count(*) FROM messages WHERE seen=0').fetchone()[0]
-                return self.respond(200,{'counts':counts,'jobs':[list(r) for r in self.elf.db.execute('SELECT state,count(*) FROM jobs GROUP BY state')]})
+                public={'enabled':bool(self.elf.public),'members':len(self.elf.public.children) if self.elf.public else 0}
+                return self.respond(200,{'counts':counts,'public_groups':public,'jobs':[list(r) for r in self.elf.db.execute('SELECT state,count(*) FROM jobs GROUP BY state')]})
         self.respond(404, {'error': 'Not found'})
 
     def do_POST(self):

@@ -4,7 +4,9 @@
 
 ![公事小精靈工具介紹](docs/presentation/slides/01.png)
 
-這是可自行部署的個人助理原型。你需要自己的 LINE 官方帳號、OpenRouter key，以及選用的 Google OAuth 憑證；本倉庫不包含作者的帳號、訊息、資料庫或筆記。
+這是可自行部署的個人助理，也能選用多人群組整理模式。部署者準備 LINE 官方帳號與 OpenRouter key，受邀者共用機器人入口，各自綁定群組、各自收到摘要。日曆與私人筆記仍只供部署者本人使用；本倉庫不包含帳號、訊息、資料庫或筆記。
+
+[多人群組整理：加入、隔離與管理方式](docs/multi-user.md)
 
 [10 頁圖文介紹](docs/presentation/README.md) · [使用教學與問題排查](docs/usage.md) · [系統與資料流程](docs/architecture.md) · [下載簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-visual/line-work-elf-illustrated-10pages.pptx)
 
@@ -28,7 +30,7 @@
 
 ## 部署完成後，先試這一輪
 
-先完成下方安裝與 Webhook 設定。這個倉庫提供自架原始碼，目前沒有公用的免安裝機器人服務。
+以下是自行部署者的驗收步驟。若你是受邀使用現有機器人的試用者，不用申請 API key，直接依[多人版教學](docs/multi-user.md#試用者怎麼開始)操作。
 
 1. 邀請自己的小精靈加入工作群，私訊 `/綁定群組`，把取得的一次性指令貼進正確群組並依提示啟用。
 2. 群內傳「測試：活動文案週五下午三點交，請我確認場地」，再私訊小精靈 `/整理`。

@@ -5,7 +5,9 @@
 <p class="lead">LINE 公事小精靈是自行部署的個人工作助理，使用 n8n、Python 與 OpenRouter 免費模型，整理指定工作群組的討論、待回覆事項與後續建議。</p>
 <img src="images/architecture.png" alt="公事小精靈的 LINE、n8n、AI 與本機工具架構">
 <h2>日曆接進對話裡</h2><p>連接自己的 Google Calendar 後，可以查詢今天、明天或本週行程，檢查空閒時間，並依明確要求新增活動。時間不完整會追問，暫定安排先確認。目前沒有修改、刪除或邀請他人的工具。</p>
-<h2>自己部署，自己授權</h2><p>本專案提供 MIT 開源程式，沒有共用的託管服務。使用者需準備自己的 LINE 官方帳號、OpenRouter 金鑰與選用的 Google OAuth 憑證；各部署者分別管理資料與第三方服務。</p>
+<h2>一起用，資料各自整理</h2><p>多人試用模式讓朋友共用同一個 LINE 官方帳號，各自同意使用、由本人綁定工作群，再私訊收取自己的摘要。每人的訊息、待辦與摘要使用獨立資料庫；日曆、私人筆記與一般私訊 Agent 保留給部署者本人。</p>
+<p>先私訊 <code>/開始使用</code> 閱讀說明，再依提示操作。多人版每日摘要預設關閉，可自行傳 <code>/每日整理 開啟</code>；未開啟時用 <code>/整理</code> 手動查看。<a href="https://github.com/johnny-0120/line-work-elf/blob/main/docs/multi-user.md">多人版完整教學</a></p>
+<p>本專案提供 MIT 開源程式。自行部署者需準備 LINE 官方帳號、OpenRouter 金鑰與選用的 Google OAuth 憑證，並自行管理資料與服務；受邀使用現有多人版的朋友不必準備 API key。</p>
 <p>維護者的 Google OAuth 應用名稱為「LINE 公事小精靈」，供個人日曆整合使用；其他部署者應建立自己的 Google Cloud 專案。</p>
 <nav><a href="https://github.com/johnny-0120/line-work-elf">原始碼與完整教學 →</a><a href="privacy.html">隱私權政策</a><a href="terms.html">使用說明與條款</a><a href="https://github.com/johnny-0120/line-work-elf/issues">聯絡與問題回報</a></nav>
 <footer>LINE 公事小精靈是獨立開源專案，與 LINE、Google、OpenRouter 或 OpenAI 無隸屬關係。</footer></main></html>
