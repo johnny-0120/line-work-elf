@@ -36,9 +36,17 @@ needs_reply 只有明確要求使用者回應/確認/交件才設 true；有後�
 使用者自己提供的「公事：」若說「請我回覆」「我需要確認」，其中「我」就是使用者。
 若僅稱「你」或沒有可識別對象，設 false；摘要可寫「待確認負責人」。
 不可將沒有看到回覆推論成確定未回覆。到期日僅保留原文明示，不自行推算。
-每筆 summary 最多 180 字，最多 15 筆。格式：
-{"items":[{"message_id":"原始ID","evidence":"原文摘錄","summary":"繁體中文公事重點與明示期限","needs_reply":false}]}
-沒有公事就回 {"items":[]}。不呼叫工具也可以完成；如需確認規則可呼叫工具。
+不要只抓日期、時間、截止日。沒有任何時間資訊的工作討論也必須整理。
+先按同一來源的討論主題整理 topics：說明剛剛在聊什麼、提出了什麼方案與理由、有哪些分歧。
+只有原文明確達成共識才放 decisions；某人提議、偏好、可能或未有人同意，不能寫成已決定。
+open_questions 整理尚未確認的負責人、選擇、資訊或問題，沒有就空字串。
+suggested_next_steps 可根據討論提出最多兩項具體下一步，只是 AI 建議，不是大家已決定的任務或授權，禁止宣稱已回覆、已安排或已執行。不要杜撰承諾、負責人或期限。
+每個 topic 必須引用同一來源的 1 至 6 則新 messages，以逐字 evidence 支持內容，不可混合群組。
+最多四個 topics，topic 最多 40 字，discussion 最多 160 字，decisions 與 open_questions 各最多 120 字，每項建議最多 100 字。
+items 保留實際工作事項與明確待回覆，避免重複抄整段主題討論。每筆 summary 最多 180 字，建議最多八筆（硬上限 15），全部輸出簡潔。
+格式：
+{"topics":[{"topic":"討論主題","discussion":"討論內容、方案與理由，不只時間","decisions":"僅明確共識，沒有就空字串","open_questions":"待釐清問題，沒有就空字串","suggested_next_steps":["基於討論的具體建議"],"references":[{"message_id":"新訊息ID","evidence":"逐字原文摘錄"}]}],"items":[{"message_id":"原始ID","evidence":"原文摘錄","summary":"繁體中文實際工作事項","needs_reply":false}]}
+沒有公事就回 {"topics":[],"items":[]}。不呼叫工具也可以完成；如需確認規則可呼叫工具。
 '''
 
 
@@ -640,6 +648,11 @@ class Elf:
                     if not isinstance(items, list) or len(items) > 15:
                         raise ValueError()
                     tasks, lines = [], ['📋 公事小整理｜' + datetime.now(TAIPEI).strftime('%m/%d %H:%M'), '範圍：尚未整理的已收集文字；非完整聊天紀錄。']
+                    from digest_topics import render_topics
+                    topics = parsed.get('topics', [])
+                    lines.extend(render_topics(topics, originals))
+                    if items:
+                        lines.append('\n【工作事項與待回覆】')
                     for item in items:
                         original = originals[item['message_id']]
                         evidence, summary = item['evidence'], item['summary']
@@ -653,7 +666,7 @@ class Elf:
                             tid = hashlib.sha256(original['id'].encode()).hexdigest()[:8]
                             tasks.append((tid, original['id'], original['source'], summary))
                             lines.append('⚑ 待你確認是否需回覆 [' + tid + ']')
-                    if not items:
+                    if not items and not topics:
                         lines.append('\n這批訊息沒有可確認的公事重點。')
                     questions = parsed.get('questions', [])
                     if not isinstance(questions, list) or len(questions)>3:
@@ -730,22 +743,29 @@ class Elf:
             # This provider requires reasoning. Leave room for the final JSON,
             # instead of exhausting the output budget on internal reasoning.
             allowed.update(max_tokens=6400,reasoning={'effort':'low','exclude':True})
-        try:
-            result=self.send('https://openrouter.ai/api/v1/chat/completions', allowed,
-                             {'Authorization': 'Bearer ' + key, 'X-Title': 'LINE Work Elf'})
-        except Problem as exc:
-            self.operation_audit('free_gateway','failed',exc.message)
-            # Free routes may not support optional JSON/reasoning parameters.
-            # Retry once; tools, zero-price limits and output checks stay intact.
-            if 'Upstream HTTP 400;' not in exc.message or not any(k in allowed for k in ('response_format','reasoning')):
-                raise
-            allowed = {k:v for k,v in allowed.items() if k not in ('response_format','reasoning')}
-            self.operation_audit('free_compat_retry','started','Dropped optional format/reasoning parameters; free-only route preserved.')
+        route_retried = compat_retried = False
+        for attempt in range(3):
             try:
                 result=self.send('https://openrouter.ai/api/v1/chat/completions',allowed,
                                  {'Authorization':'Bearer '+key,'X-Title':'LINE Work Elf'})
-            except Problem as retry_error:
-                self.operation_audit('free_gateway','failed',retry_error.message)
+                break
+            except Problem as exc:
+                self.operation_audit('free_gateway','failed',exc.message)
+                missing = any('Upstream HTTP '+str(code)+';' in exc.message for code in (404,410))
+                if missing and allowed['model'] != FREE_MODEL and not route_retried:
+                    allowed['model'] = FREE_MODEL
+                    allowed.pop('reasoning',None)
+                    allowed['max_tokens'] = 2400
+                    route_retried = True
+                    self.operation_audit('free_model_retry','started','Unavailable free variant; retry via the free-only router with zero price caps.')
+                    continue
+                # One compatibility retry, preserving tools and zero-price caps.
+                if ('Upstream HTTP 400;' in exc.message and not compat_retried
+                        and any(k in allowed for k in ('response_format','reasoning'))):
+                    allowed = {k:v for k,v in allowed.items() if k not in ('response_format','reasoning')}
+                    compat_retried = True
+                    self.operation_audit('free_compat_retry','started','Dropped optional format/reasoning parameters; free-only route preserved.')
+                    continue
                 raise
         self.operation_audit('free_gateway','received',json.dumps({
             'model':result.get('model'),

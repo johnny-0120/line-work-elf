@@ -310,6 +310,92 @@ class ElfTests(unittest.TestCase):
         self.assertEqual(data['messages'][0]['owner_mentioned'], 1)
         self.assertEqual(data['owner_names'], ['Test Owner'])
 
+    def discussion_output(self, mid, **changes):
+        topic = {'topic': '活動宣傳形式',
+                 'discussion': '討論宣傳是否改用短影片，理由是靜態圖難說明活動內容。',
+                 'decisions': '', 'open_questions': '尚未確認採用哪個形式。',
+                 'suggested_next_steps': ['先比較短影片與靜態圖的製作需求，再讓群組確認。'],
+                 'references': [{'message_id': mid, 'evidence': '活動宣傳改用短影片'}]}
+        topic.update(changes)
+        return json.dumps({'topics': [topic], 'items': []}, ensure_ascii=False)
+
+    def test_missing_free_variant_uses_only_free_router_with_zero_caps(self):
+        attempts = []
+        def upstream(url, body, headers):
+            attempts.append(dict(body))
+            if len(attempts) == 1:
+                raise Problem(502, 'Upstream HTTP 404; no paid fallback was attempted.')
+            return {'choices': [{'message': {'content': '{}'}}]}
+        self.elf.send = upstream
+        with patch.dict(os.environ, {'OPENROUTER_FREE_MODEL': 'retired/model:free'}):
+            self.elf.proxy({'model': 'openrouter/free', 'messages': []})
+        self.assertEqual([a['model'] for a in attempts], ['retired/model:free','openrouter/free'])
+        self.assertTrue(all(a['provider']['max_price'] == {'prompt':0,'completion':0} for a in attempts))
+        self.assertTrue(all('models' not in a for a in attempts))
+
+    def test_auth_failure_does_not_retry_on_another_model(self):
+        attempts = []
+        def upstream(url, body, headers):
+            attempts.append(body)
+            raise Problem(502, 'Upstream HTTP 401; no paid fallback was attempted.')
+        self.elf.send = upstream
+        with self.assertRaises(Problem):
+            self.elf.proxy({'model':'openrouter/free','messages':[]})
+        self.assertEqual(len(attempts),1)
+
+    def test_discussion_without_dates_includes_content_and_advice_without_tasks(self):
+        self.enable()
+        event = self.event('我們提議活動宣傳改用短影片，靜態圖不好說明內容，大家還沒決定。')
+        self.ingest(event)
+        job = self.elf.prepare()
+        self.elf.deliver(job['job_id'], self.discussion_output(event['message']['id']))
+        text = self.calls[-1][1]['messages'][0]['text']
+        self.assertIn('聊了什麼：', text)
+        self.assertIn('尚待釐清：', text)
+        self.assertIn('AI 建議，尚未決定或執行', text)
+        self.assertNotIn('已確認結論：', text)
+        self.assertNotIn('沒有可確認的公事', text)
+        self.assertEqual(self.elf.db.execute('SELECT count(*) FROM tasks').fetchone()[0], 0)
+        self.assertEqual(self.elf.db.execute('SELECT seen FROM messages').fetchone()[0], 1)
+
+    def test_discussion_rejects_fabricated_evidence_and_preserves_pending(self):
+        mid = self.seed()
+        job = self.elf.prepare()
+        with self.assertRaises(Problem):
+            self.elf.deliver(job['job_id'], self.discussion_output(mid))
+        self.assertEqual(self.elf.db.execute('SELECT seen FROM messages').fetchone()[0], 0)
+
+    def test_discussion_cannot_merge_sources(self):
+        self.enable()
+        first = self.event('活動宣傳改用短影片')
+        self.ingest(first)
+        self.ingest(self.event('/工作群組 Another', sid='G-second'))
+        other = self.event('活動宣傳改用短影片', sid='G-second')
+        self.ingest(other)
+        job = self.elf.prepare()
+        refs = [{'message_id': e['message']['id'], 'evidence': '活動宣傳改用短影片'} for e in (first, other)]
+        with self.assertRaises(Problem):
+            self.elf.deliver(job['job_id'], self.discussion_output(first['message']['id'], references=refs))
+
+    def test_discussion_accepts_multiple_grounded_messages_and_decision(self):
+        self.enable()
+        first = self.event('活動宣傳改用短影片可以嗎？')
+        second = self.event('大家同意使用短影片。')
+        self.ingest(first); self.ingest(second)
+        job = self.elf.prepare()
+        refs = [{'message_id': first['message']['id'], 'evidence': '活動宣傳改用短影片'},
+                {'message_id': second['message']['id'], 'evidence': '大家同意使用短影片'}]
+        self.elf.deliver(job['job_id'], self.discussion_output(first['message']['id'], references=refs,
+                        decisions='採用短影片。', open_questions=''))
+        self.assertIn('已確認結論：採用短影片。', self.calls[-1][1]['messages'][0]['text'])
+
+    def test_discussion_limits_and_missing_evidence_are_rejected(self):
+        mid = self.seed(); job = self.elf.prepare()
+        for changes in ({'references': []}, {'discussion': ''}, {'suggested_next_steps': ['x'] * 3},
+                        {'topic': 'x' * 41}, {'references': [{'message_id': 'old-context', 'evidence': '文案'}]}):
+            with self.subTest(changes=changes), self.assertRaises(Problem):
+                self.elf.deliver(job['job_id'], self.discussion_output(mid, **changes))
+
 
 if __name__ == '__main__':
     unittest.main()
