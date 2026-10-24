@@ -152,6 +152,10 @@ class Elf:
         self.db.execute('INSERT OR IGNORE INTO known_groups(id,name,owner_seen,present,created) SELECT id,name,1,1,? FROM sources WHERE id!=?', (time.time(),os.getenv('LINE_OWNER_USER_ID','')))
         self.db.commit()
 
+        if 'messages_json' not in {row[1] for row in self.db.execute('PRAGMA table_info(outbox)')}:
+            self.db.execute('ALTER TABLE outbox ADD COLUMN messages_json TEXT')
+            self.db.commit()
+
         if not member and os.getenv('PUBLIC_GROUPS_ENABLED','0') == '1':
             from public_groups import PublicGroups
             self.public = PublicGroups(self, path)
@@ -174,7 +178,10 @@ class Elf:
         self.db.execute('UPDATE event_audit SET last_received=?,deliveries=deliveries+1,redelivery=MAX(redelivery,?) WHERE event_id=? AND payload_hash=?',
             (now,int(bool(event.get('deliveryContext',{}).get('isRedelivery'))),eid,payload_hash))
 
-    def line(self, body, reply_token=None, retry_key=None):
+    def reply_messages(self, event, text):
+        return None
+
+    def line(self, body, reply_token=None, retry_key=None, messages=None):
         from line_api import ensure_token, LineAuthError
         try:
             token = ensure_token()
@@ -183,13 +190,13 @@ class Elf:
         headers = {'Authorization': 'Bearer ' + token}
         if reply_token:
             endpoint = 'reply'
-            payload = {'replyToken': reply_token, 'messages': [{'type': 'text', 'text': body[:4800]}]}
+            payload = {'replyToken': reply_token, 'messages': messages or [{'type': 'text', 'text': body[:4800]}]}
         else:
             endpoint = 'push'
             owner = self.owner_id
             if not owner:
                 raise Problem(503, 'LINE_OWNER_USER_ID is not configured.')
-            payload = {'to': owner, 'messages': [{'type': 'text', 'text': body[:4800]}]}
+            payload = {'to': owner, 'messages': messages or [{'type': 'text', 'text': body[:4800]}]}
             headers['X-Line-Retry-Key'] = retry_key or str(uuid.uuid4())
         try:
             return self.send('https://api.line.me/v2/bot/message/' + endpoint, payload, headers)
@@ -316,11 +323,12 @@ class Elf:
                             self.db.execute('INSERT OR IGNORE INTO messages(id,source,sender,text,timestamp,owner_mentioned) VALUES(?,?,?,?,?,?)',
                                             (msg['id'], sid, uid, text[:4000], int(event.get('timestamp', time.time()*1000)), int(mentioned)))
                     if reply and event.get('replyToken'):
+                        messages=self.reply_messages(event,reply)
                         if self.asynchronous:
-                            self.db.execute('INSERT OR IGNORE INTO outbox(id,text,reply_token,created) VALUES(?,?,?,?)',
-                                (eid, reply, event['replyToken'], time.time()))
+                            self.db.execute('INSERT OR IGNORE INTO outbox(id,text,reply_token,created,messages_json) VALUES(?,?,?,?,?)',
+                                (eid, reply, event['replyToken'], time.time(),json.dumps(messages,ensure_ascii=False) if messages else None))
                         else:
-                            self.line(reply, reply_token=event['replyToken'])
+                            self.line(reply, reply_token=event['replyToken'],messages=messages)
                     elif text.startswith(('私事','#private')):
                         disposition='private_excluded'
                 self.audit_event(event,payload_hash,verified,disposition)
@@ -581,7 +589,8 @@ class Elf:
             try:
                 # Reply tokens cannot be safely retried. Failed acknowledgements
                 # are dropped; actual calendar results always use idempotent push.
-                self.line(message['text'], reply_token=message['reply_token'], retry_key=message['id'] if not message['reply_token'] else None)
+                self.line(message['text'], reply_token=message['reply_token'], retry_key=message['id'] if not message['reply_token'] else None,
+                          messages=json.loads(message['messages_json']) if message['messages_json'] else None)
             except Problem:
                 with self.lock:
                     if message['reply_token']:

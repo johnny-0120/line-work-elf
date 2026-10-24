@@ -8,6 +8,10 @@
 
 [多人群組整理：加入、隔離與管理方式](docs/multi-user.md)
 
+![多人版 LINE 六格功能選單](docs/images/line-menu.png)
+
+選用多人版時，新朋友加好友會收到引導卡片。按「開始使用」閱讀資料說明，再按鈕開通、複製自己的綁定指令；機器人進群也會提示每位成員各自開通。日常整理、群組列表與設定都能從選單操作。
+
 [10 頁圖文介紹](docs/presentation/README.md) · [使用教學與問題排查](docs/usage.md) · [系統與資料流程](docs/architecture.md) · [下載簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-visual/line-work-elf-illustrated-10pages.pptx)
 
 ## 群組聊過的事，整理後接著做

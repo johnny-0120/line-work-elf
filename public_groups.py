@@ -40,6 +40,32 @@ class MemberElf(Elf):
                          owner_id=uid, member=True)
         self.db.execute('PRAGMA secure_delete=ON')
 
+    def own_groups(self):
+        return [dict(row) for row in self.db.execute('SELECT s.name,s.enabled FROM sources s JOIN group_bindings b ON b.id=s.id ORDER BY s.name')]
+
+    def reply_messages(self,event,text):
+        import onboarding as ui
+        command=event.get('message',{}).get('text','').strip()
+        if event.get('source',{}).get('type')!='user':
+            msg=ui.text_message(text)
+            msg['quickReply']={'items':[{'type':'action','action':{'type':'uri','label':'回私訊查看下一步','uri':ui.chat_url()}}]}
+            return [msg]
+        if command=='/綁定群組': return [ui.pairing(text)]
+        if command in ('/說明','/開始','/開始使用','/加入試用'): return [ui.dashboard(self.own_groups())]
+        if command=='/群組': return [ui.group_list(self.own_groups())]
+        if command=='/邀請教學': return [ui.invitation()]
+        if command=='/資料管理': return [ui.data_controls()]
+        if command=='/使用設定':
+            row=self.broker.parent.db.execute('SELECT automatic FROM public_members WHERE uid=?',(self.owner_id,)).fetchone()
+            return [ui.settings(bool(row[0]))]
+        return [ui.text_message(text)]
+
+    def line(self,body,reply_token=None,retry_key=None,messages=None):
+        if messages is None:
+            from onboarding import text_message
+            messages=[text_message(body)]
+        return super().line(body,reply_token,retry_key,messages)
+
     def command(self, text, sid, source_type):
         if source_type in ('group','room'):
             if not text.startswith(('/綁定群組 ', '/工作群組', '/暫停收集', '/停止收集')):
@@ -63,6 +89,10 @@ class MemberElf(Elf):
             return result,run
         if text in ('/說明','/開始','/開始使用','/加入試用'):
             return HELP,False
+        if text in ('/使用設定','/資料管理','/邀請教學'):
+            return {'/使用設定':'你可開關自己的每日摘要、查看用量與管理資料。',
+                    '/資料管理':'可移除自己的群組，或清除本機帳戶；不影響他人。',
+                    '/邀請教學':'先加我為好友，再在目標群組的邀請功能選擇我；回私訊取得並複製自己的綁定指令。'}[text],False
         if text.startswith('/解除群組 '):
             name=text[len('/解除群組 '):].strip()
             rows=self.db.execute('SELECT id FROM sources WHERE name=?',(name,)).fetchall()
@@ -154,14 +184,14 @@ class PublicGroups:
     def total(self):
         return self.parent.db.execute('SELECT COALESCE(SUM(calls),0) FROM public_usage WHERE day=?',(self.day(),)).fetchone()[0]
 
-    def reply(self,event,text):
+    def reply(self,event,text,messages=None):
         token=event.get('replyToken')
         if not token: return
         if self.parent.asynchronous:
-            self.parent.db.execute('INSERT OR IGNORE INTO outbox(id,text,reply_token,created) VALUES(?,?,?,?)',
-                                   ('public-reply:'+event['webhookEventId'],text,token,time.time()))
+            self.parent.db.execute('INSERT OR IGNORE INTO outbox(id,text,reply_token,created,messages_json) VALUES(?,?,?,?,?)',
+                                   ('public-reply:'+event['webhookEventId'],text,token,time.time(),json.dumps(messages,ensure_ascii=False) if messages else None))
         else:
-            self.parent.line(text,reply_token=token)
+            self.parent.line(text,reply_token=token,messages=messages)
 
     def forget(self,key):
         child=self.children.pop(key)
@@ -176,6 +206,7 @@ class PublicGroups:
         # Usage persists as non-content anti-abuse accounting until expiry.
 
     def ingest(self,payload):
+        import onboarding as ui
         trigger=False
         for event in payload.get('events',[]):
             eid=event.get('webhookEventId')
@@ -207,9 +238,17 @@ class PublicGroups:
                             child=self.open(uid,tenant)
                             code,_=child.command('/綁定群組',uid,'user')
                             child.db.commit()
-                            self.reply(event,'已建立你的獨立空間，未啟用任何群組。\n'+code+'\n\n'+HELP)
+                            self.reply(event,'已建立你的獨立空間，未啟用任何群組。\n'+code+'\n\n'+HELP,
+                                       [ui.pairing(code)])
                     else:
-                        self.reply(event,CONSENT)
+                        if member:
+                            child=self.open(uid,member['tenant'])
+                            message=ui.dashboard(child.own_groups())
+                        elif event.get('type')=='follow': message=ui.welcome()
+                        elif text=='/邀請教學': message=ui.invitation()
+                        elif text in ('/開始使用','/開始','/綁定群組','/使用設定'): message=ui.consent()
+                        else: message=ui.welcome()
+                        self.reply(event,CONSENT,[message])
                 elif member and text=='/刪除我的資料':
                     self.forget(member['tenant'])
                     self.reply(event,'你的群組綁定、訊息、摘要與待辦已從本機清除，已停止使用。已送出的 LINE 訊息、第三方服務紀錄與既有備份不會因此撤回；不影響其他人。')
@@ -220,8 +259,14 @@ class PublicGroups:
                         result=child.ingest(body,base_signature(body))
                         trigger=trigger or result['run']
                     elif text:
-                        self.reply(event,'多人版不收集或分析一般私訊。請用 /綁定群組、/整理 或 /說明。')
+                        notice='多人版不收集或分析一般私訊。你可以按下方按鈕操作，或從底部選單開始。'
+                        self.reply(event,notice,[ui.text_message(notice)])
             elif kind in ('group','room'):
+                if event.get('type')=='join':
+                    self.reply(event,'小精靈已加入。每位成員請各自開啟我的私訊，按「開始使用」；不會自動收集任何人的訊息。',[ui.invitation(group=True)])
+                if (event.get('type')=='message' and uid!=self.parent.owner_id
+                    and text in ('/開始','/開始使用','/同意並開始','/綁定群組','/整理','/立即整理','/說明','/使用設定')):
+                    self.reply(event,'請先開啟我的私訊，建立自己的空間；摘要只私訊本人。',[ui.invitation(group=True)])
                 if event.get('type')=='memberLeft':
                     departed={m.get('userId') for m in event.get('left',{}).get('members',[]) if isinstance(m,dict)}
                     for child in self.children.values():

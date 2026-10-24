@@ -1,4 +1,4 @@
-"""Build and install the owner's LINE six-button rich menu."""
+"""Build owner controls and a public onboarding menu without sharing data."""
 import hashlib
 import json
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib import request, error
 
 from elf import ROOT, load_env
-from line_api import api, ensure_token, LineAuthError
+from line_api import api, ensure_token, LineAuthError, save_settings
 
 BUTTONS = [('立即整理', '彙整工作重點', '/整理', 'paper'),
            ('待回覆', '查看待處理事項', '/待回覆', 'check'),
@@ -14,38 +14,58 @@ BUTTONS = [('立即整理', '彙整工作重點', '/整理', 'paper'),
            ('明日行程', '提前安排明天', '/行程 明天', 'tomorrow'),
            ('新增行程', '指定時間與主題', '/新增行程', 'plus'),
            ('使用說明', '功能與操作方式', '/說明', 'help')]
+PUBLIC_BUTTONS = [('開始使用','第一次來，從這裡開始','/開始使用','start'),
+                  ('綁定工作群','取得專屬綁定指令','/綁定群組','link'),
+                  ('立即整理','整理自己的新討論','/整理','paper'),
+                  ('我的群組','查看自己的收集來源','/群組','groups'),
+                  ('待回覆','查看自己的待辦','/待回覆','check'),
+                  ('使用設定','每日摘要與資料管理','/使用設定','settings')]
 
 
-def definition():
+def definition(public=False):
     areas = []
-    for index, (label, _, command, _) in enumerate(BUTTONS):
+    for index, (label, _, command, _) in enumerate(PUBLIC_BUTTONS if public else BUTTONS):
         col, row = index % 3, index // 3
         left, right = col * 2500 // 3, (col+1)*2500//3
         areas.append({'bounds': {'x': left, 'y': row*843, 'width': right-left, 'height': 843},
                       'action': {'type': 'message', 'label': label, 'text': command}})
     return {'size': {'width': 2500, 'height': 1686}, 'selected': True,
-            'name': '公事小精靈功能選單 v1', 'chatBarText': '開啟功能選單', 'areas': areas}
+            'name': '公事小精靈｜'+('多人群組引導 v2' if public else '個人工具 v2'),
+            'chatBarText': '開始使用・群組整理' if public else '開啟功能選單', 'areas': areas}
 
 
-def image_file():
+def image_file(public=False):
     from PIL import Image, ImageDraw, ImageFont
-    img = Image.new('RGB', (2500, 1686), '#f0f4f2')
+    img = Image.new('RGB', (2500, 1686), '#0B1018')
     draw = ImageDraw.Draw(img)
     bold = ImageFont.truetype('C:/Windows/Fonts/msjhbd.ttc', 92)
     regular = ImageFont.truetype('C:/Windows/Fonts/msjh.ttc', 43)
     small = ImageFont.truetype('C:/Windows/Fonts/msjhbd.ttc', 82)
-    for i, (title, subtitle, _, icon) in enumerate(BUTTONS):
+    for i, (title, subtitle, _, icon) in enumerate(PUBLIC_BUTTONS if public else BUTTONS):
         col, row = i%3, i//3
         x0, x1 = col*2500//3, (col+1)*2500//3
         top = row*843
         active = i == 0
-        bg, fg, muted = ('#087b69', '#ffffff', '#c0e7dd') if active else ('#f7faf8', '#185449', '#618078')
+        bg, fg, muted = ('#3157B0', '#FFFFFF', '#D3E0FF') if active else ('#172130', '#F4F7FF', '#AABAD3')
         draw.rounded_rectangle((x0+20, top+20, x1-20, top+823), radius=42, fill=bg)
         cx, cy = (x0+x1)//2, top+268
-        draw.ellipse((cx-133, cy-133, cx+133, cy+133), fill='#258f7e' if active else '#e3eeea')
+        draw.ellipse((cx-133, cy-133, cx+133, cy+133), fill='#4067C0' if active else '#24344D')
         def line(points, width=12):
             draw.line(points, fill=fg, width=width, joint='curve')
-        if icon == 'paper':
+        if icon == 'start':
+            draw.polygon([(cx-35,cy-73),(cx-35,cy+73),(cx+80,cy)],fill='#FFBD59')
+        elif icon == 'link':
+            draw.rounded_rectangle((cx-91,cy-45,cx+16,cy+37),radius=25,outline=fg,width=11)
+            draw.rounded_rectangle((cx-16,cy-15,cx+91,cy+67),radius=25,outline=fg,width=11)
+        elif icon == 'groups':
+            for dx,dy in ((-68,0),(68,0),(0,-32)):
+                draw.ellipse((cx+dx-26,cy+dy-55,cx+dx+26,cy+dy-3),outline=fg,width=8)
+                draw.arc((cx+dx-45,cy+dy+8,cx+dx+45,cy+dy+81),180,360,fill=fg,width=8)
+        elif icon == 'settings':
+            for dy,dx in ((-55,-35),(0,45),(55,-10)):
+                line([(cx-85,cy+dy),(cx+85,cy+dy)],8)
+                draw.ellipse((cx+dx-17,cy+dy-17,cx+dx+17,cy+dy+17),fill='#FFBD59')
+        elif icon == 'paper':
             draw.rounded_rectangle((cx-65,cy-85,cx+65,cy+85),radius=12,outline=fg,width=10)
             for dy in (-35,0,35):
                 line([(cx-36,cy+dy),(cx+36,cy+dy)],8)
@@ -67,22 +87,28 @@ def image_file():
             draw.text((cx,cy-3),'?',font=ImageFont.truetype('C:/Windows/Fonts/msjhbd.ttc',125),fill=fg,anchor='mm')
         draw.text((cx,top+480),title,font=bold,fill=fg,anchor='mm')
         draw.text((cx,top+595),subtitle,font=regular,fill=muted,anchor='mm')
-    path = ROOT / 'rich-menu.png'
+    path = ROOT / ('rich-menu-public.png' if public else 'rich-menu.png')
     img.save(path, optimize=True)
-    preview = ROOT / 'rich-menu-preview.png'
+    preview = ROOT / ('rich-menu-public-preview.png' if public else 'rich-menu-preview.png')
     img.resize((1000,674)).save(preview)
     return path
 
 
-def install():
+def install(public=False):
     load_env()
     owner = os.getenv('LINE_OWNER_USER_ID')
     if not owner:
         raise LineAuthError('Owner must be configured first.')
-    path = image_file()
-    body = definition()
+    if public:
+        basic=api('GET','/v2/bot/info').get('basicId')
+        if not basic:
+            raise LineAuthError('Cannot resolve the official account basic ID.')
+        save_settings({'PUBLIC_BOT_BASIC_ID':basic})
+    path = image_file(public)
+    body = definition(public)
     api('POST', '/v2/bot/richmenu/validate', body)
-    state = Path(os.environ.get('LOCALAPPDATA', str(ROOT))) / 'LineWorkElf/state/rich-menu.json'
+    state_root=Path(os.environ.get('ELF_STATE_DIR', str(Path(os.environ.get('LOCALAPPDATA',str(ROOT)))/'LineWorkElf/state')))
+    state = state_root / ('rich-menu-public.json' if public else 'rich-menu.json')
     fingerprint = hashlib.sha256(path.read_bytes()+json.dumps(body).encode()).hexdigest()
     previous = json.loads(state.read_text(encoding='utf-8')) if state.exists() else {}
     menu_id = previous.get('id') if previous.get('fingerprint') == fingerprint else None
@@ -99,16 +125,19 @@ def install():
             raise LineAuthError(f'Rich menu upload HTTP {exc.code}.') from None
         state.parent.mkdir(parents=True, exist_ok=True)
         state.write_text(json.dumps({'id':menu_id,'fingerprint':fingerprint}),encoding='utf-8')
-    # Only the owner needs these controls. No other user's menu is changed.
-    api('POST', '/v2/bot/user/' + owner + '/richmenu/' + menu_id)
-    verified = api('GET', '/v2/bot/user/' + owner + '/richmenu')
-    print(json.dumps({'installed': verified.get('richMenuId') == menu_id, 'buttons': len(body['areas']), 'scope':'owner'}))
+    # A per-user owner menu takes precedence over the shared default menu.
+    endpoint='/v2/bot/user/all/richmenu' if public else '/v2/bot/user/'+owner+'/richmenu'
+    api('POST', endpoint+'/'+menu_id)
+    verified = api('GET', endpoint)
+    result={'installed':verified.get('richMenuId')==menu_id,'buttons':len(body['areas']),'scope':'default' if public else 'owner'}
+    print(json.dumps(result))
+    return result
 
 
 if __name__ == '__main__':
     import sys
     if '--preview' in sys.argv:
-        image_file()
+        image_file('--public' in sys.argv)
         print('Preview generated.')
     else:
-        install()
+        install('--public' in sys.argv)
