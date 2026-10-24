@@ -39,7 +39,7 @@ needs_reply 只有明確要求使用者回應/確認/交件才設 true；有後�
 不要只抓日期、時間、截止日。沒有任何時間資訊的工作討論也必須整理。
 先按同一來源的討論主題整理 topics：說明剛剛在聊什麼、提出了什麼方案與理由、有哪些分歧。
 只有原文明確達成共識才放 decisions；某人提議、偏好、可能或未有人同意，不能寫成已決定。
-open_questions 整理尚未確認的負責人、選擇、資訊或問題，沒有就空字串。
+open_questions 只整理原文明確尚未確認的負責人、選擇、資訊或問題，沒有就空字串。不得把自己想到的預算、時程等新問題當成原文缺漏；新問題只能放建議。
 suggested_next_steps 可根據討論提出最多兩項具體下一步，只是 AI 建議，不是大家已決定的任務或授權，禁止宣稱已回覆、已安排或已執行。不要杜撰承諾、負責人或期限。
 每個 topic 必須引用同一來源的 1 至 6 則新 messages，以逐字 evidence 支持內容，不可混合群組。
 最多四個 topics，topic 最多 40 字，discussion 最多 160 字，decisions 與 open_questions 各最多 120 字，每項建議最多 100 字。
@@ -651,8 +651,8 @@ class Elf:
                     from digest_topics import render_topics
                     topics = parsed.get('topics', [])
                     lines.extend(render_topics(topics, originals))
-                    if items:
-                        lines.append('\n【工作事項與待回覆】')
+                    covered = {ref['message_id'] for topic in topics for ref in topic['references']}
+                    work_heading = False
                     for item in items:
                         original = originals[item['message_id']]
                         evidence, summary = item['evidence'], item['summary']
@@ -660,6 +660,11 @@ class Elf:
                             raise ValueError()
                         if not isinstance(summary, str) or not 1 <= len(summary) <= 180 or type(item['needs_reply']) is not bool:
                             raise ValueError()
+                        if original['id'] in covered and not item['needs_reply']:
+                            continue
+                        if not work_heading:
+                            lines.append('\n【工作事項與待回覆】')
+                            work_heading = True
                         lines.append('\n【' + original['name'] + '】' + summary)
                         lines.append('依據：' + evidence[:100])
                         if item['needs_reply']:

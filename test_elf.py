@@ -365,6 +365,23 @@ class ElfTests(unittest.TestCase):
             self.elf.deliver(job['job_id'], self.discussion_output(mid))
         self.assertEqual(self.elf.db.execute('SELECT seen FROM messages').fetchone()[0], 0)
 
+    def test_discussion_deduplicates_covered_items_but_preserves_owner_tasks(self):
+        mid=self.seed();job=self.elf.prepare()
+        topic={'topic':'文案交件','discussion':'討論活動文案交件。','references':[
+            {'message_id':mid,'evidence':'校園大使文案'}]}
+        output=json.loads(self.output(mid,needs_reply=False))
+        output['topics']=[topic]
+        self.elf.deliver(job['job_id'],json.dumps(output,ensure_ascii=False))
+        self.assertNotIn('【工作事項與待回覆】',self.calls[-1][1]['messages'][0]['text'])
+        # Existing task coverage is exercised by the original delivery test;
+        # a covered true task must still be visible and persisted.
+        self.elf.db.execute('UPDATE messages SET seen=0')
+        self.elf.db.commit()
+        job=self.elf.prepare()
+        output=json.loads(self.output(mid));output['topics']=[topic]
+        self.elf.deliver(job['job_id'],json.dumps(output,ensure_ascii=False))
+        self.assertEqual(self.elf.db.execute('SELECT count(*) FROM tasks').fetchone()[0],1)
+
     def test_discussion_cannot_merge_sources(self):
         self.enable()
         first = self.event('活動宣傳改用短影片')
