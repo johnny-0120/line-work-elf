@@ -174,6 +174,8 @@ https://你的通道網址/webhook/line-work-elf
 
 Google Calendar：將自己的桌面 OAuth JSON 存成 `%LOCALAPPDATA%\LineWorkElf\state\google-client.json`，開啟 `http://127.0.0.1:8791` 完成 Google 授權。連線使用 Google Calendar events.owned 與 freebusy 權限，程式目前提供查詢與新增；權限本身較廣，可在 Google 帳戶撤銷。憑證與 refresh token 只留在自己的本機。
 
+如果 Google OAuth 專案是外部「測試」模式，Calendar 授權的 refresh token 通常七天到期；電腦保持開機也無法延長。連線頁會顯示 Google 提供的剩餘期限，失效後提示重新授權。一般的一小時 access token 到期會自動更新；`invalid_grant` 則需要重新開啟連線頁授權。要避免測試模式的七天限制，需在 Google Cloud 完成應用程式設定並轉為正式發布；這不代表應用程式已通過 Google 驗證。參考 [Google 的權杖有效期說明](https://developers.google.com/identity/protocols/oauth2#expiration)。
+
 ## 資料、隱私與限制
 
 - LINE 官方 API 無法讀全部個人聊天，也不能自動加入所有群組或回補入群前歷史。群組需逐一邀請且完成綁定。

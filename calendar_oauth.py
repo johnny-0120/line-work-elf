@@ -9,7 +9,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib import parse
 
-from calendar_client import read_client, client_file, token_file, save_token, exchange, SCOPES, CalendarError
+from calendar_client import read_client, client_file, token_file, save_token, exchange, SCOPES, CalendarError, GoogleCalendar
 
 sessions = {}
 connect_csrf = secrets.token_urlsafe(32)
@@ -41,13 +41,19 @@ class OAuthHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'ok')
             return
         if url.path == '/':
-            connected = token_file().exists()
+            connection=GoogleCalendar().status()
+            connected = connection['connected']
             try:
                 read_client()
                 configured = True
             except CalendarError:
                 configured = False
             content = '<h1>公事小精靈 × Google Calendar</h1><p>連線狀態：' + ('已儲存授權' if connected else '尚未授權') + '</p>'
+            if connection.get('reauthorization_required'):
+                content += '<p><strong>原有授權已失效，請重新連接。</strong></p>'
+            if connected and connection.get('refresh_expires_at'):
+                days=max(0,int((connection['refresh_expires_at']-time.time()+86399)//86400))
+                content += '<p>Google 回傳的自動續期授權約剩 '+str(days)+' 天。測試模式授權有七天限制；期限到後需重新連線。</p>'
             if configured:
                 content += '<p>授權後，小精靈可以讀取你擁有的行事曆事件、檢查空閒時間，並依你在 LINE 的指令新增行程。程式只提供查詢與新增，不提供刪除行程或邀請他人。</p><form method="post" action="/connect"><input type="hidden" name="csrf" value="' + connect_csrf + '"><button>連接 Google Calendar</button></form>'
             else:

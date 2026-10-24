@@ -12,8 +12,8 @@ SCOPES = ['https://www.googleapis.com/auth/calendar.events.owned',
 
 
 class CalendarError(Exception):
-    def __init__(self, message, status=None):
-        self.status = status
+    def __init__(self, message, status=None, code=None):
+        self.status, self.code = status, code
         super().__init__(message)
 
 
@@ -41,6 +41,10 @@ def read_client():
 
 
 def save_token(data):
+    data = dict(data)
+    if data.get('refresh_token_expires_in') and not data.get('refresh_expires_at'):
+        issued = data.get('expires_at',time.time()) - int(data.get('expires_in',0))
+        data['refresh_expires_at'] = issued + int(data['refresh_token_expires_in'])
     path = token_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.pending')
@@ -59,7 +63,13 @@ def exchange(form):
         with request.urlopen(req, timeout=25) as response:
             return json.load(response)
     except error.HTTPError as exc:
-        raise CalendarError('Google 授權未完成或已到期，請重新連線。', exc.code) from None
+        try:
+            reason = json.loads(exc.read()).get('error')
+        except (ValueError,TypeError):
+            reason = None
+        if reason == 'invalid_grant':
+            raise CalendarError('Google 的自動續期授權已過期或遭撤銷，請在電腦開啟 http://127.0.0.1:8791 重新連線。若 Google 專案仍在測試模式，授權通常七天到期。',exc.code,'invalid_grant') from None
+        raise CalendarError('Google 授權未完成，請確認 OAuth 用戶端設定後重新連線。', exc.code) from None
     except (error.URLError, TimeoutError, ValueError):
         raise CalendarError('目前無法連線 Google，請稍後重試。') from None
 
@@ -69,7 +79,17 @@ class GoogleCalendar:
         self.lock = threading.RLock()
 
     def status(self):
-        return {'client_configured': client_file().is_file(), 'connected': token_file().is_file(),
+        try:
+            saved=json.loads(token_file().read_text(encoding='utf-8'))
+        except (OSError,ValueError):
+            saved={}
+        expiry=saved.get('refresh_expires_at')
+        if not expiry and saved.get('refresh_token_expires_in'):
+            expiry=saved.get('expires_at',0)-int(saved.get('expires_in',0))+int(saved['refresh_token_expires_in'])
+        expired=bool(expiry and expiry<=time.time())
+        return {'client_configured': client_file().is_file(),
+                'connected':bool(saved.get('refresh_token') and not expired and saved.get('authorization_error')!='invalid_grant'),
+                'refresh_expires_at':expiry,'reauthorization_required':expired or saved.get('authorization_error')=='invalid_grant',
                 'calendar': os.getenv('GOOGLE_CALENDAR_ID', 'primary')}
 
     def access_token(self):
@@ -78,16 +98,25 @@ class GoogleCalendar:
                 saved = json.loads(token_file().read_text(encoding='utf-8'))
             except (OSError, ValueError):
                 raise CalendarError('尚未連接 Google Calendar，請在電腦開啟 http://127.0.0.1:8791 完成授權。') from None
+            if saved.get('authorization_error')=='invalid_grant':
+                raise CalendarError('Google 授權已失效，請在電腦開啟 http://127.0.0.1:8791 重新連線。',400,'invalid_grant')
             if saved.get('access_token') and saved.get('expires_at', 0) > time.time() + 60:
                 return saved['access_token']
             client = read_client()
             if not saved.get('refresh_token'):
                 raise CalendarError('Google 授權已到期，請重新連線。')
-            fresh = exchange({'grant_type': 'refresh_token', 'client_id': client['client_id'],
-                              'client_secret': client.get('client_secret', ''), 'refresh_token': saved['refresh_token']})
+            try:
+                fresh = exchange({'grant_type': 'refresh_token', 'client_id': client['client_id'],
+                                  'client_secret': client.get('client_secret', ''), 'refresh_token': saved['refresh_token']})
+            except CalendarError as exc:
+                if exc.code=='invalid_grant':
+                    save_token({**saved,'authorization_error':'invalid_grant'})
+                raise
             fresh['refresh_token'] = fresh.get('refresh_token', saved['refresh_token'])
             fresh['expires_at'] = time.time() + int(fresh.get('expires_in', 3600))
-            save_token(fresh)
+            if fresh.get('refresh_token_expires_in'):
+                fresh['refresh_expires_at']=time.time()+int(fresh['refresh_token_expires_in'])
+            save_token({**saved,**fresh})
             return fresh['access_token']
 
     def api(self, method, path, body=None, query=None):
