@@ -75,6 +75,11 @@ class CompanionTests(unittest.TestCase):
         withdraw(a,first['message']['id'])
         self.assertEqual(a.db.execute('SELECT count(*) FROM conversation_imports').fetchone()[0],0)
 
+    def test_expired_input_buffer_is_removed_by_pruning(self):
+        a=self.register('alice');self.send('/整理雙人對話','alice');self.send('甲：稍後確認','alice')
+        a.db.execute('UPDATE ui_sessions SET expires=0');a.prune()
+        self.assertEqual(a.db.execute('SELECT count(*) FROM ui_sessions').fetchone()[0],0)
+
 class ChatTests(unittest.TestCase):
     setUp=test_natural.NaturalTests.setUp
     tearDown=test_natural.NaturalTests.tearDown

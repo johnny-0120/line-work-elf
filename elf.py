@@ -542,6 +542,7 @@ class Elf:
         self.db.execute('DELETE FROM assistant_jobs WHERE created<?', (cutoff,))
         self.db.execute('DELETE FROM agent_actions WHERE created<?', (cutoff,))
         self.db.execute('DELETE FROM proposals WHERE created<?', (time.time()-86400,))
+        self.db.execute('DELETE FROM ui_sessions WHERE expires<?',(time.time(),))
         self.db.execute('DELETE FROM personal_notes WHERE created<?',(time.time()-30*86400,))
         self.db.execute('DELETE FROM conversation_imports WHERE created<?',(time.time()-86400,))
         self.db.execute('DELETE FROM conversation_parts WHERE cid NOT IN (SELECT id FROM conversation_imports)')
