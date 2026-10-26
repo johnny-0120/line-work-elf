@@ -1,0 +1,10 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>公事小精靈｜個人日曆</title><style>body{font:18px/1.8 system-ui;background:#edf4fc;color:#17243a;margin:5vh auto;max-width:640px;padding:24px}main{background:white;border-radius:24px;padding:28px}a{display:inline-block;background:#516d98;color:white;padding:12px 20px;border-radius:14px;text-decoration:none}</style><main><h1 id="title">連接你的日曆</h1><p id="status">正在準備個人連線。</p><a id="next" hidden>繼續</a></main><script>
+const args=new URLSearchParams(location.search),origin=sessionStorage.getItem('elfCalendarOrigin')||'';
+history.replaceState(null,'',location.pathname);
+if(/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin)&&args.has('state')){
+ sessionStorage.removeItem('elfCalendarOrigin');
+ const safe=new URLSearchParams();for(const key of ['state','code','error'])if(args.has(key))safe.set(key,args.get(key));
+ document.getElementById('status').textContent='正在把授權結果安全送回你開始連線的小精靈。';
+ location.replace(origin+'/calendar/callback?'+safe.toString());
+}else document.getElementById('status').textContent='找不到原來的連線視窗。請回到 LINE，重新按 Google Calendar，並使用同一個瀏覽器完成登入。';
+</script></html>

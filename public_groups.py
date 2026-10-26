@@ -43,7 +43,14 @@ class MemberElf(Elf):
     def own_groups(self):
         return [dict(row) for row in self.db.execute('SELECT s.name,s.enabled FROM sources s JOIN group_bindings b ON b.id=s.id ORDER BY s.name')]
 
+    def calendar(self):
+        from member_calendar import MemberCalendar
+        return MemberCalendar(self)
+
     def reply_messages(self,event,text):
+        from interaction import render
+        rendered=render(self,event,text)
+        if rendered:return rendered
         import onboarding as ui
         command=event.get('message',{}).get('text','').strip()
         if event.get('source',{}).get('type')!='user':
@@ -67,6 +74,12 @@ class MemberElf(Elf):
         return super().line(body,reply_token,retry_key,messages)
 
     def command(self, text, sid, source_type):
+        from interaction import handle
+        handled=handle(self,text,sid,source_type)
+        if handled is not None:return handled
+        if text=='/行程' or text.startswith(('/行程 ','/新增行程 ')):
+            if not self.calendar().status()['connected']:return '請先按 Google Calendar 卡片完成個人授權。',False
+            return super().command(text,sid,source_type)
         if source_type in ('group','room'):
             if not text.startswith(('/綁定群組 ', '/工作群組', '/暫停收集', '/停止收集')):
                 return None, False
@@ -246,7 +259,7 @@ class PublicGroups:
                             message=ui.dashboard(child.own_groups())
                         elif event.get('type')=='follow': message=ui.welcome()
                         elif text=='/邀請教學': message=ui.invitation()
-                        elif text in ('/開始使用','/開始','/綁定群組','/使用設定'): message=ui.consent()
+                        elif text in ('/開始使用','/開始','/綁定群組','/使用設定','/綁定此群'): message=ui.consent()
                         else: message=ui.welcome()
                         self.reply(event,CONSENT,[message])
                 elif member and text=='/刪除我的資料':
@@ -254,7 +267,8 @@ class PublicGroups:
                     self.reply(event,'你的群組綁定、訊息、摘要與待辦已從本機清除，已停止使用。已送出的 LINE 訊息、第三方服務紀錄與既有備份不會因此撤回；不影響其他人。')
                 elif member and event.get('type')=='message':
                     child=self.open(uid,member['tenant'])
-                    if text.startswith('/'):
+                    from interaction import wizard
+                    if text.startswith('/') or wizard(child):
                         body=event_body(event)
                         result=child.ingest(body,base_signature(body))
                         trigger=trigger or result['run']
@@ -265,8 +279,10 @@ class PublicGroups:
                 if event.get('type')=='join':
                     self.reply(event,'小精靈已加入。每位成員請各自開啟我的私訊，按「開始使用」；不會自動收集任何人的訊息。',[ui.invitation(group=True)])
                 if (event.get('type')=='message' and uid!=self.parent.owner_id
-                    and text in ('/開始','/開始使用','/同意並開始','/綁定群組','/整理','/立即整理','/說明','/使用設定')):
-                    self.reply(event,'請先開啟我的私訊，建立自己的空間；摘要只私訊本人。',[ui.invitation(group=True)])
+                    and text in ('/開始','/開始使用','/同意並開始','/綁定群組','/整理','/立即整理','/說明','/使用設定','/綁定此群')):
+
+                    if not member or text!='/綁定此群':
+                        self.reply(event,'請先開啟我的私訊，建立自己的空間；摘要只私訊本人。',[ui.invitation(group=True)])
                 if event.get('type')=='memberLeft':
                     departed={m.get('userId') for m in event.get('left',{}).get('members',[]) if isinstance(m,dict)}
                     for child in self.children.values():
@@ -277,7 +293,7 @@ class PublicGroups:
                             child.db.commit()
                 # Only the code's owner can bind. No raw group data enters a
                 # database before this signed actor has enabled that source.
-                if member and text.startswith(('/綁定群組 ','/工作群組','/暫停收集','/停止收集')):
+                if member and text.startswith(('/綁定群組 ','/工作群組','/暫停收集','/停止收集','/綁定此群')):
                     child=self.open(uid,member['tenant'])
                     body=event_body(event)
                     child.ingest(body,base_signature(body))

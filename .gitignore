@@ -33,3 +33,5 @@ supervisor-status.json
 *.pdf
 .DS_Store
 Thumbs.db
+
+/rich-menu*.png

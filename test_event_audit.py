@@ -79,7 +79,8 @@ class EventAuditTests(unittest.TestCase):
 
     def pairing_code(self):
         self.ingest(self.event('/綁定群組',source='user'))
-        text=self.calls[-1][1]['messages'][0]['text']
+        message=self.calls[-1][1]['messages'][0]
+        text=next(b['action']['clipboardText'] for b in message['contents']['footer']['contents'] if b['action']['type']=='clipboard')
         return re.search(r'/綁定群組 ([A-F0-9]{10})',text)[1]
 
     def test_one_time_pairing_binds_only_the_selected_group(self):

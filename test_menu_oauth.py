@@ -27,7 +27,7 @@ class MenuOAuthTests(unittest.TestCase):
             rects.append(rect)
             area += b['width']*b['height']
         self.assertEqual(area, 2500*1686)
-        self.assertEqual([x['action']['text'] for x in data['areas']], [x[2] for x in BUTTONS])
+        self.assertEqual([x['action']['data'].removeprefix('elf:v1:') for x in data['areas']], [x[2] for x in BUTTONS])
 
     def test_oauth_requires_csrf_and_rejects_foreign_origin(self):
         server = ThreadingHTTPServer(('127.0.0.1', 0), calendar_oauth.OAuthHandler)

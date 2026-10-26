@@ -15,11 +15,11 @@ BUTTONS = [('立即整理', '彙整工作重點', '/整理', 'paper'),
            ('新增行程', '指定時間與主題', '/新增行程', 'plus'),
            ('使用說明', '功能與操作方式', '/說明', 'help')]
 PUBLIC_BUTTONS = [('開始使用','第一次來，從這裡開始','/開始使用','start'),
-                  ('綁定工作群','取得專屬綁定指令','/綁定群組','link'),
+                  ('綁定工作群','點選完成群組綁定','/綁定群組','link'),
                   ('立即整理','整理自己的新討論','/整理','paper'),
                   ('我的群組','查看自己的收集來源','/群組','groups'),
                   ('待回覆','查看自己的待辦','/待回覆','check'),
-                  ('使用設定','每日摘要與資料管理','/使用設定','settings')]
+                  ('使用設定','日曆連線與整理偏好','/使用設定','settings')]
 
 
 def definition(public=False):
@@ -28,15 +28,15 @@ def definition(public=False):
         col, row = index % 3, index // 3
         left, right = col * 2500 // 3, (col+1)*2500//3
         areas.append({'bounds': {'x': left, 'y': row*843, 'width': right-left, 'height': 843},
-                      'action': {'type': 'message', 'label': label, 'text': command}})
+                      'action': __import__('interaction').action(label,command)})
     return {'size': {'width': 2500, 'height': 1686}, 'selected': True,
             'name': '公事小精靈｜'+('多人群組引導 v2' if public else '個人工具 v2'),
             'chatBarText': '開始使用・群組整理' if public else '開啟功能選單', 'areas': areas}
 
 
-def image_file(public=False):
+def image_file(public=False, dark=False):
     from PIL import Image, ImageDraw, ImageFont
-    img = Image.new('RGB', (2500, 1686), '#0B1018')
+    img = Image.new('RGB', (2500, 1686), '#101A2C' if dark else '#A8C0DF')
     draw = ImageDraw.Draw(img)
     bold = ImageFont.truetype('C:/Windows/Fonts/msjhbd.ttc', 92)
     regular = ImageFont.truetype('C:/Windows/Fonts/msjh.ttc', 43)
@@ -46,14 +46,14 @@ def image_file(public=False):
         x0, x1 = col*2500//3, (col+1)*2500//3
         top = row*843
         active = i == 0
-        bg, fg, muted = ('#3157B0', '#FFFFFF', '#D3E0FF') if active else ('#172130', '#F4F7FF', '#AABAD3')
+        bg, fg, muted = (('#294360', '#EDF4FF', '#B6CAE4') if active else ('#1B2C45', '#DCE9FA', '#A8C0DF')) if dark else (('#A8C0DF', '#17243A', '#344D70') if active else ('#DCE8F6', '#17243A', '#405C80'))
         draw.rounded_rectangle((x0+20, top+20, x1-20, top+823), radius=42, fill=bg)
         cx, cy = (x0+x1)//2, top+268
-        draw.ellipse((cx-133, cy-133, cx+133, cy+133), fill='#4067C0' if active else '#24344D')
+        draw.ellipse((cx-133, cy-133, cx+133, cy+133), fill=('#314969' if dark else '#C6D9EF'))
         def line(points, width=12):
             draw.line(points, fill=fg, width=width, joint='curve')
         if icon == 'start':
-            draw.polygon([(cx-35,cy-73),(cx-35,cy+73),(cx+80,cy)],fill='#FFBD59')
+            draw.polygon([(cx-35,cy-73),(cx-35,cy+73),(cx+80,cy)],fill=('#A8C0DF' if dark else '#516D98'))
         elif icon == 'link':
             draw.rounded_rectangle((cx-91,cy-45,cx+16,cy+37),radius=25,outline=fg,width=11)
             draw.rounded_rectangle((cx-16,cy-15,cx+91,cy+67),radius=25,outline=fg,width=11)
@@ -64,7 +64,7 @@ def image_file(public=False):
         elif icon == 'settings':
             for dy,dx in ((-55,-35),(0,45),(55,-10)):
                 line([(cx-85,cy+dy),(cx+85,cy+dy)],8)
-                draw.ellipse((cx+dx-17,cy+dy-17,cx+dx+17,cy+dy+17),fill='#FFBD59')
+                draw.ellipse((cx+dx-17,cy+dy-17,cx+dx+17,cy+dy+17),fill=('#A8C0DF' if dark else '#516D98'))
         elif icon == 'paper':
             draw.rounded_rectangle((cx-65,cy-85,cx+65,cy+85),radius=12,outline=fg,width=10)
             for dy in (-35,0,35):
@@ -85,11 +85,17 @@ def image_file(public=False):
         else:
             draw.ellipse((cx-78,cy-78,cx+78,cy+78),outline=fg,width=10)
             draw.text((cx,cy-3),'?',font=ImageFont.truetype('C:/Windows/Fonts/msjhbd.ttc',125),fill=fg,anchor='mm')
+        avatar=ROOT/'assets/avatar.png'
+        if active and avatar.exists():
+            portrait=Image.open(avatar).convert('RGB').resize((266,266))
+            mask=Image.new('L',(266,266));ImageDraw.Draw(mask).ellipse((0,0,265,265),fill=255)
+            img.paste(portrait,(cx-133,cy-133),mask)
         draw.text((cx,top+480),title,font=bold,fill=fg,anchor='mm')
         draw.text((cx,top+595),subtitle,font=regular,fill=muted,anchor='mm')
-    path = ROOT / ('rich-menu-public.png' if public else 'rich-menu.png')
+    suffix = '-dark' if dark else ''
+    path = ROOT / (('rich-menu-public' if public else 'rich-menu')+suffix+'.png')
     img.save(path, optimize=True)
-    preview = ROOT / ('rich-menu-public-preview.png' if public else 'rich-menu-preview.png')
+    preview = ROOT / (('rich-menu-public' if public else 'rich-menu')+suffix+'-preview.png')
     img.resize((1000,674)).save(preview)
     return path
 

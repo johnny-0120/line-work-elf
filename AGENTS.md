@@ -17,3 +17,5 @@ state directory. Run `python tools/check_public_files.py` after staging files.
 
 Do not start services, install a supervisor, connect a personal account or run
 real LINE/Calendar requests as part of automated verification.
+
+Member Calendar is now opt-in via member_calendar.py/member_oauth.py. Each grant stays in that member SQLite calendar_tokens table. Never use owner GoogleCalendar or Obsidian context for members. Preserve signed button actor checks, browser-bound OAuth state + PKCE, one-use tickets, and the relay endpoint allowlist. No real member authorization may be performed without that person.

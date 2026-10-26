@@ -117,6 +117,8 @@ class Elf:
         self.db.executescript('''
         CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY, created REAL);
         CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY, name TEXT, enabled INTEGER);
+        CREATE TABLE IF NOT EXISTS ui_sessions(id INTEGER PRIMARY KEY,data TEXT,expires REAL);
+        CREATE TABLE IF NOT EXISTS calendar_tokens(id INTEGER PRIMARY KEY,data TEXT);
         CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, source TEXT, sender TEXT,
             text TEXT, timestamp INTEGER, seen INTEGER DEFAULT 0, owner_mentioned INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, payload TEXT, state TEXT,
@@ -172,14 +174,19 @@ class Elf:
         eid=str(event.get('webhookEventId') or fallback_id)
         now=time.time()
         self.db.execute('INSERT OR IGNORE INTO event_audit VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            (eid,payload_hash,kind,ref,event.get('type','unknown'),stamp,now,now,0,int(verified),
+            (eid,payload_hash,kind,ref,event.get('_native_type',event.get('type','unknown')),stamp,now,now,0,int(verified),
              int(bool(event.get('deliveryContext',{}).get('isRedelivery'))),disposition,
              int(bool(self.owner_id and source.get('userId')==self.owner_id))))
         self.db.execute('UPDATE event_audit SET last_received=?,deliveries=deliveries+1,redelivery=MAX(redelivery,?) WHERE event_id=? AND payload_hash=?',
             (now,int(bool(event.get('deliveryContext',{}).get('isRedelivery'))),eid,payload_hash))
 
     def reply_messages(self, event, text):
-        return None
+        from interaction import render
+        return render(self,event,text)
+
+    def calendar(self):
+        from calendar_client import GoogleCalendar
+        return GoogleCalendar()
 
     def line(self, body, reply_token=None, retry_key=None, messages=None):
         from line_api import ensure_token, LineAuthError
@@ -187,6 +194,9 @@ class Elf:
             token = ensure_token()
         except LineAuthError as exc:
             raise Problem(503, str(exc)) from None
+        if messages is None:
+            from onboarding import text_message
+            messages=[text_message(body)]
         headers = {'Authorization': 'Bearer ' + token}
         if reply_token:
             endpoint = 'reply'
@@ -223,11 +233,14 @@ class Elf:
                     self.audit_event(event,payload_hash,False,'destination_mismatch',str(i))
                 self.db.commit()
             raise Problem(401,'LINE destination does not match this bot.')
+        from interaction import decode,normalize_text
+        payload['events']=[decode(e) for e in payload.get('events',[])]
         trigger = False
         with self.lock:
             if self.public:
                 trigger = self.public.ingest(payload)
             for index,event in enumerate(payload.get('events', [])):
+                event=normalize_text(self,event)
                 eid = event.get('webhookEventId')
                 if not eid:
                     self.audit_event(event,payload_hash,verified,'missing_event_id',str(index))
@@ -367,6 +380,9 @@ class Elf:
                     self.db.execute("SELECT 1 FROM jobs WHERE state='pending' AND created>=? LIMIT 1", (cutoff,)).fetchone())
 
     def command(self, text, sid, source_type):
+        from interaction import handle
+        handled=handle(self,text,sid,source_type)
+        if handled is not None:return handled
         if text == '/綁定群組' and source_type=='user':
             code=secrets.token_hex(5).upper()
             self.db.execute('DELETE FROM group_pairings')
@@ -570,9 +586,9 @@ class Elf:
         if job:
             try:
                 if detail:
-                    result = execute(GoogleCalendar(), job['command'], job['id'], metadata=json.loads(detail[0]))
+                    result = execute(self.calendar(), job['command'], job['id'], metadata=json.loads(detail[0]))
                 else:
-                    result = execute(GoogleCalendar(), job['command'], job['id'])
+                    result = execute(self.calendar(), job['command'], job['id'])
             except CalendarError as exc:
                 result = '行事曆未完成：' + str(exc) + '\n若剛才連線中斷，請稍後傳 /重試行程；會先檢查原行程，避免重複建立。'
                 state = 'failed'

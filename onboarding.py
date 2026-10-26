@@ -4,13 +4,14 @@ import re
 from urllib.parse import quote
 
 SITE='https://johnny-0120.github.io/line-work-elf/'
-BLUE='#6F9BFF'
-AMBER='#FFBD59'
-INK='#111722'
+BLUE='#91AED2'
+AMBER='#405C80'
+INK='#EDF4FC'
 
 
 def action(label,text):
-    return {'type':'message','label':label,'text':text}
+    from interaction import action as native_action
+    return native_action(label,text)
 
 
 def chat_url():
@@ -31,14 +32,14 @@ def button(label,command=None,uri=None,clipboard=None,primary=False):
     act=({'type':'uri','label':label,'uri':uri} if uri else
          {'type':'clipboard','label':label,'clipboardText':clipboard} if clipboard else action(label,command))
     return {'type':'button','style':'primary' if primary else 'secondary','height':'sm',
-            'color':'#3659B8' if primary else '#DCE6FA','action':act}
+            'color':'#516D98' if primary else '#DCE6F4','action':act}
 
 
 def card(label,title,paragraphs,buttons,alt):
     contents=[{'type':'text','text':label,'color':AMBER,'size':'xs','weight':'bold'},
-              {'type':'text','text':title,'color':'#FFFFFF','size':'xl','weight':'bold','wrap':True,'margin':'md'}]
+              {'type':'text','text':title,'color':'#17243A','size':'xl','weight':'bold','wrap':True,'margin':'md'}]
     for paragraph in paragraphs:
-        contents.append({'type':'text','text':paragraph,'color':'#CAD4E3','size':'sm','wrap':True,'margin':'lg'})
+        contents.append({'type':'text','text':paragraph,'color':'#405C80','size':'sm','wrap':True,'margin':'lg'})
     return {'type':'flex','altText':alt[:400],
             'contents':{'type':'bubble','size':'mega',
                 'body':{'type':'box','layout':'vertical','backgroundColor':INK,'paddingAll':'22px','contents':contents},
@@ -68,21 +69,24 @@ def pairing(reply):
     match=re.search(r'^/綁定群組 ([0-9A-F]{10})$',reply,re.M)
     if not match:return text_message(reply)
     command='/綁定群組 '+match[1]
-    return card('下一步 · 綁定工作群','把這行貼到你的群組',
-        ['① 先邀請「公事小精靈」加入目標工作群。\n② 按下方「複製綁定指令」。\n③ 由你本人貼到該群組並送出。',
+    return card('下一步 · 綁定工作群','邀我進群，再點一下綁定',
+        ['① 在工作群組的邀請功能選擇「公事小精靈」。\n② 在群組歡迎卡片按「同意並綁定這個群組」。\n③ 回到我的私訊，按「我的群組」即可管理。',
+         '也可按「選擇群組並送出綁定」，在手機 LINE 的分享視窗選擇已加入小精靈的目標群組並確認送出，不必手動輸入。電腦版可用複製指令備援。',
          command,'代碼 10 分鐘內有效，只能由你本人使用一次。每人最多綁定 5 群；不會讀取綁定前的歷史訊息。'],
-        [button('複製綁定指令',clipboard=command,primary=True),button('如何邀請我入群','/邀請教學'),button('完成了，查看我的群組','/群組')],
+        [button('選擇群組並送出綁定',uri='https://line.me/R/share?text='+quote(command,safe=''),primary=True),button('查看加入群組步驟','/邀請教學'),button('完成了，查看我的群組','/群組'),button('電腦備用：複製指令',clipboard=command)],
         '請複製這行並由你本人貼到目標工作群：'+command+'（10 分鐘有效）。')
 
 
 def invitation(group=False):
     buttons=([button('開啟私訊，建立自己的空間',uri=chat_url(),primary=True)] if group else
              [button('我已邀請入群，取得綁定指令','/綁定群組',primary=True)])
+    basic=os.getenv('PUBLIC_BOT_BASIC_ID','')
+    if basic and not group:buttons.append(button('分享小精靈給朋友或群組',uri='https://line.me/R/nv/recommendOA/'+quote(basic,safe='')))
     return card('每位成員，各自開通','同一隻小精靈，\n各自整理自己的工作。' if group else '怎麼把我加入群組？',
-        ['① 先加我為好友。\n② 開啟目標群組的成員邀請，從好友選擇「公事小精靈」。\n③ 回到我的私訊，按「綁定工作群」，再把指令貼回群組。',
+        ['① 先加我為好友，並在私訊按「開始使用」開通。\n② 開啟目標群組的成員邀請，從好友選擇「公事小精靈」。\n③ 在群組的歡迎卡片按「同意並綁定這個群組」。找不到卡片時，可使用備用綁定方式。',
          '先向群組成員說明會使用外部 AI。每個想收摘要的人，都要用自己的 LINE 私訊開通並綁定；別人代貼代碼無效。',
          '只收集綁定後的新文字，摘要私訊本人，不會貼在群裡。手機可按下方開啟私訊；電腦版可直接點我的頭像進入聊天。'],
-        buttons,'小精靈已加入群組！每位想整理的成員請各自開啟我的私訊，按「開始使用」；尚未自動收集任何人的訊息。')
+        ([button('同意並綁定這個群組','/綁定此群',primary=True)]+buttons) if group else buttons,'小精靈已加入群組！每位想整理的成員請各自開啟我的私訊，按「開始使用」；尚未自動收集任何人的訊息。')
 
 
 def dashboard(groups):

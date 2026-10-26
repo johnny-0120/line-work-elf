@@ -1,0 +1,10 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>公事小精靈｜個人日曆</title><style>body{font:18px/1.8 system-ui;background:#edf4fc;color:#17243a;margin:5vh auto;max-width:640px;padding:24px}main{background:white;border-radius:24px;padding:28px}a{display:inline-block;background:#516d98;color:white;padding:12px 20px;border-radius:14px;text-decoration:none}</style><main><h1 id="title">連接你的日曆</h1><p id="status">正在準備個人連線。</p><a id="next" hidden>繼續</a></main><script>
+const input=new URLSearchParams(location.hash.slice(1));
+history.replaceState(null,'',location.pathname);
+const origin=input.get('origin')||'', ticket=input.get('ticket')||'';
+if(/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin)&&/^[0-9a-f]{64}\.\d{10}\.[0-9a-f]{32}\.[0-9a-f]{64}$/.test(ticket)){
+ sessionStorage.setItem('elfCalendarOrigin',origin);
+ const next=document.getElementById('next');next.href=origin+'/calendar/connect?ticket='+encodeURIComponent(ticket);next.hidden=false;
+ document.getElementById('status').textContent='請確認這是你剛剛從公事小精靈取得的個人連結。繼續後可登入自己的 Google 帳號。連結十分鐘內有效，請勿轉傳。';
+}else document.getElementById('status').textContent='連結不完整，請回到 LINE 的 Google Calendar 卡片重新開始。';
+</script></html>

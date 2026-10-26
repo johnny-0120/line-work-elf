@@ -34,6 +34,8 @@ class OAuthHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        from member_oauth import handle
+        if handle(self,'GET'):return
         url = parse.urlsplit(self.path)
         if url.path == '/health':
             self.send_response(200)
@@ -85,6 +87,8 @@ class OAuthHandler(BaseHTTPRequestHandler):
         self.page('<h1>找不到此頁</h1>', 404)
 
     def do_POST(self):
+        from member_oauth import handle
+        if handle(self,'POST'):return
         try:
             length = int(self.headers.get('Content-Length', '0'))
         except ValueError:

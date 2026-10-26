@@ -57,7 +57,7 @@ class OnboardingTests(unittest.TestCase):
         self.send('怎麼用','alice')
         self.assertEqual(self.calls[-1][1]['messages'][0]['type'],'flex')
         self.register('alice');self.send('/開始使用','alice')
-        self.assertIn('目前還沒有綁定群組',json.dumps(self.calls[-1][1],ensure_ascii=False))
+        self.assertIn('今天，想先整理什麼',json.dumps(self.calls[-1][1],ensure_ascii=False))
 
     def test_async_flex_messages_survive_database_queue(self):
         self.elf.asynchronous=True
@@ -71,7 +71,7 @@ class OnboardingTests(unittest.TestCase):
 class MenuBuilderTests(unittest.TestCase):
     def test_public_six_buttons_are_safe_member_commands(self):
         data=definition(public=True)
-        self.assertEqual([x['action']['text'] for x in data['areas']],[x[2] for x in PUBLIC_BUTTONS])
+        self.assertEqual([x['action']['data'].removeprefix('elf:v1:') for x in data['areas']],[x[2] for x in PUBLIC_BUTTONS])
         self.assertNotIn('/行程 今天',json.dumps(data))
         self.assertEqual(sum(a['bounds']['width']*a['bounds']['height'] for a in data['areas']),2500*1686)
 

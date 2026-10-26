@@ -213,3 +213,20 @@ GitHub Actions 以 Windows／Python 3.12、3.13 執行離線測試與公開檔�
 本倉庫自有程式與工作流採 [MIT License](LICENSE)。沒有附上 n8n、Node.js、cloudflared 或模型權重；第三方依賴與服務仍依各自授權及條款使用，本倉庫的 MIT 不會變更其授權。n8n 的授權檔請見 [上游 LICENSE.md](https://github.com/n8n-io/n8n/blob/master/LICENSE.md)。
 
 參考：[LINE Messaging API](https://developers.line.biz/en/docs/messaging-api/overview/) · [n8n npm 安裝](https://docs.n8n.io/hosting/installation/npm/) · [OpenRouter](https://openrouter.ai/docs) · [Google Calendar API](https://developers.google.com/workspace/calendar/api/quickstart/python)
+
+
+## 點選就能操作
+
+![手繪淡藍小精靈](assets/avatar.png)
+
+底部選單與卡片使用 LINE 原生按鈕，平常不用記斜線指令。舊指令仍可使用。
+
+- **綁定群組**：先在私訊開通，再邀請小精靈加入工作群，點群內歡迎卡片的「同意並綁定這個群組」。LINE 仍要求使用者自己邀請機器人入群；按鈕不能繞過這一步。找不到卡片時，可用一次性代碼備援。
+- **群組管理**：點「我的群組」選擇來源，即可暫停、恢復或確認解除。只操作自己的綁定。
+- **待回覆**：每項事項都有「已處理這一項」按鈕。
+- **新增行程**：輸入主題，用日期時間選擇器選擇開始與結束時間，再按「確認新增」。實際寫入前仍檢查衝突。
+- **個人日曆**：在「使用設定 → Google Calendar」取得十分鐘有效的個人連線。網頁 OAuth 憑證設定完成後，使用者可登入自己的 Google 帳號；未設定時會明確顯示尚未開放，不會借用管理者的授權。
+
+手機版個人日曆使用另外的 **Web OAuth client**，設定 `GOOGLE_WEB_OAUTH_CLIENT_FILE` 指向本機 Web JSON。回呼網址須與 `member_calendar.CALLBACK` 完全一致。`docs/calendar-connect.html` 與 `docs/calendar-callback.html` 需部署到同一個 HTTPS 網站；更換網站時也要修改程式中的網址。示例目前限制連回 Cloudflare Quick Tunnel，入口重啟後舊連結可能失效，回 LINE 取得新連結即可。正式公開服務建議改用固定網域。
+
+各人日曆 token 存在自己的 SQLite `calendar_tokens` 表，不進入管理者的日曆檔案或摘要提示。解除連線會移除本機 token 並取消尚未執行的日曆要求；Google 帳號中的第三方授權與既有備份需另外處理。一般群組摘要不會主動讀取日曆。
