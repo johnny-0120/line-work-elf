@@ -1,4 +1,5 @@
 """Restricted member OAuth endpoints. No owner grants are reachable through this handler."""
+from contextlib import closing,contextmanager
 import base64
 import hashlib
 import hmac
@@ -18,15 +19,19 @@ from calendar_client import SCOPES,exchange,CalendarError
 sessions={}
 lock=threading.Lock()
 
+@contextmanager
 def database(tenant):
     if not re.fullmatch('[0-9a-f]{64}',tenant):raise ValueError()
     root=Path(os.environ['ELF_DB']).resolve()
     # Never create an account or a DB from an anonymous browser request.
-    with sqlite3.connect(root.as_uri()+'?mode=ro',uri=True) as index:
+    with closing(sqlite3.connect(root.as_uri()+'?mode=ro',uri=True)) as index:
         if not index.execute('SELECT 1 FROM public_members WHERE tenant=?',(tenant,)).fetchone():raise ValueError()
     path=root.parent/'members'/(tenant+'.sqlite3')
     if path.is_symlink() or not path.is_file():raise ValueError()
-    return sqlite3.connect(path,timeout=10)
+    db=sqlite3.connect(path,timeout=10)
+    try:
+        with db:yield db
+    finally:db.close()
 
 def validate(ticket):
     parts=ticket.split('.')
