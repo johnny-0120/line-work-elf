@@ -23,7 +23,7 @@ class OAuthHandler(BaseHTTPRequestHandler):
 
     def page(self, content, status=200):
         body = ('<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>公事小精靈｜Google Calendar</title><style>body{font:17px/1.8 system-ui;max-width:760px;margin:60px auto;padding:24px;background:#f5f7fa;color:#18232f}main{padding:32px;background:white;border-radius:20px}a{color:#087d65}button{font:inherit;padding:10px 24px;background:#087d65;color:white;border:0;border-radius:10px}code{background:#eef2f5;padding:3px 7px}</style><main>' + content + '</main></html>').encode()
+            '<title>公事小精靈｜Google Calendar</title><style>body{font:17px/1.8 system-ui;max-width:760px;margin:60px auto;padding:24px;background:#edf4fc;color:#17243a}main{padding:32px;background:white;border-radius:20px}a{color:#516d98}button{font:inherit;padding:10px 24px;background:#516d98;color:white;border:0;border-radius:10px}code{background:#eef2f5;padding:3px 7px}</style><main>' + content + '</main></html>').encode()
         self.send_response(status)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Cache-Control', 'no-store')
