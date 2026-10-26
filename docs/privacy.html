@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>隱私權政策｜LINE 公事小精靈</title><link rel="stylesheet" href="site.css">
-<main><p class="label">LINE WORK ELF · PRIVACY</p><h1>資料怎麼處理</h1><p>更新日期：2026 年 10 月 24 日。本頁說明公開原始碼的資料流程，以及維護者以 Google Cloud 專案 LINE Work Elf 提供的個人日曆整合。自行部署者須依實際設定提供自己的告知。</p>
+<main><p class="label">LINE WORK ELF · PRIVACY</p><h1>資料怎麼處理</h1><p>更新日期：2026 年 10 月 27 日。本頁說明公開原始碼的資料流程，以及維護者以 Google Cloud 專案 LINE Work Elf 提供的個人日曆整合。自行部署者須依實際設定提供自己的告知。</p>
 <h2>讀取的資料與用途</h2><p>小精靈接收傳給官方帳號的訊息，以及機器人已加入且啟用收集的工作對話，用於摘要、待辦與指令辨識。它無法讀取機器人未加入的對話或任意取得 LINE 歷史紀錄。選用 Obsidian 時，會搜尋部署者設定的本機筆記庫。</p>
 <p>多人群組版需先私訊同意，再由取得代碼的本人在群中綁定，只收集綁定後的新文字。一般試用者的普通私訊不送 AI；只處理加入、綁定、摘要、待辦與設定指令。每人的訊息、來源、摘要及待辦使用獨立 SQLite 檔案，摘要只私訊該使用者；試用者不能使用部署者的私人筆記或 Google Calendar。中央索引另存 LINE 使用者對應、加入時間、摘要排程、事件去重與用量計數。</p>
 <p>獨立資料庫是程式與檔案的隔離，不是端對端加密，服務管理者仍能管理電腦上的檔案。摘要產生與送出前會向 LINE 核對群組身分；離群或停止收集會撤銷對應來源。</p>
@@ -12,6 +12,6 @@
 <h2>停止收集與撤銷</h2><p>群組可使用 <code>/暫停收集</code> 暫停，或 <code>/停止收集</code> 停止並刪除自己的該來源資料，不影響其他試用者。多人版另可私訊 <code>/解除群組 完整名稱</code> 移除自己的單一來源，或 <code>/刪除我的資料</code> 清除本機帳戶的綁定、訊息、摘要與待辦；短期防濫用計數仍保留約八天。備份最多保留七天，已送出的 LINE 訊息與外部服務紀錄不會因此撤回。</p>
 <p>部署者自己的私訊可用 <code>/暫停私訊辨識</code>；「私事」或 <code>#private</code> 開頭的文字會排除 AI 分析。未明確標記的群組內容須經 AI 判斷，請勿傳送不願交給外部服務處理的資料。</p>
 <p>可隨時到 <a href="https://myaccount.google.com/connections">Google 帳戶的第三方連線</a> 撤銷日曆權限。撤銷後程式不能再續期存取；已建立的 Google 活動不會因此刪除，本機已有紀錄也須另外清理。</p>
-<h2>Google 資料使用</h2><p>本專案使用 Google 使用者資料僅為上述使用者功能，不出售資料，不用於廣告或訓練通用 AI 模型。Google API 資料的使用與轉移遵循 <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>，包括 Limited Use 要求。</p>
+<h2>明確保存的筆記與手動對話</h2><p>使用者按「記一則」或明確說「幫我記住」後，內容存於自己的 personal_notes 表，保留約三十天，不自動進公事摘要或日曆。按「整理雙人對話」後可連續轉傳或貼上文字，按「開始整理」才送至 OpenRouter 免費模型；原文與分析暫存約二十四小時。只有本人按保存或加入待辦，才建立對應資料。已送出的訊息及備份仍依各自期限處理。目前不會直接解析聊天檔案、圖片或語音附件。</p><h2>Google 資料使用</h2><p>本專案使用 Google 使用者資料僅為上述使用者功能，不出售資料，不用於廣告或訓練通用 AI 模型。Google API 資料的使用與轉移遵循 <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>，包括 Limited Use 要求。</p>
 <p>公開原始碼與問題請至 <a href="https://github.com/johnny-0120/line-work-elf/issues">GitHub Issues</a> 聯絡；請勿在公開問題中附上日曆內容、對話、金鑰或權杖。個別部署資料的存取與刪除，請聯絡該部署者。</p>
 <nav><a href="index.html">回首頁</a><a href="terms.html">使用說明與條款</a></nav><section><h2>自選 Google Calendar 連線</h2><p>使用者可另外授權自己的 Google Calendar，用於查詢及經確認後新增活動。Google 權限包含管理自己擁有的活動與查看空閒時間。每人的授權存於自己的本機 SQLite 空間；管理者仍能管理本機檔案，備份可能短期保留。授權不會加入群組摘要提示，其他使用者無法透過介面取得。</p><p>可在小精靈的日曆卡片解除本機連線，再到 Google 帳號的第三方連線撤銷授權。解除連線不刪除已建立的活動。請勿轉傳個人連線網址。</p></section></main></html>

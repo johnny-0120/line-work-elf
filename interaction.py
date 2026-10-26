@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import onboarding as ui
 
 PREFIX='elf:v1:'
-FIXED={'/開始使用','/同意並開始','/綁定群組','/綁定此群','/邀請教學','/群組','/待回覆','/整理','/立即整理','/使用設定','/資料管理','/刪除我的資料','/狀態','/說明','/行事曆','/連接行事曆','/行程 今天','/行程 明天','/行程 本週','/新增行程','/取消操作','/行程開始','/行程結束','/確認新增','/每日整理 開啟','/每日整理 關閉','/解除日曆確認','/解除日曆'}
+FIXED={'/完成對話輸入','/新手教學','/整理雙人對話','/記一則','/我的記錄','/開始使用','/同意並開始','/綁定群組','/綁定此群','/邀請教學','/群組','/待回覆','/整理','/立即整理','/使用設定','/資料管理','/刪除我的資料','/狀態','/說明','/行事曆','/連接行事曆','/行程 今天','/行程 明天','/行程 本週','/新增行程','/取消操作','/行程開始','/行程結束','/確認新增','/每日整理 開啟','/每日整理 關閉','/解除日曆確認','/解除日曆'}
 
 def action(label,command):
     return {'type':'postback','label':label[:20],'data':PREFIX+command,'displayText':label[:300]}
@@ -19,7 +19,7 @@ def decode(event):
     if event.get('type')!='postback': return event
     data=event.get('postback',{}).get('data','')
     command=data[len(PREFIX):] if isinstance(data,str) and data.startswith(PREFIX) else ''
-    valid=command in FIXED or bool(re.fullmatch(r'/(?:來源|來源暫停|來源恢復|來源移除確認|來源移除|來源改名) [0-9a-f]{16}',command)) or bool(re.fullmatch(r'/已處理 [A-Za-z0-9-]{1,80}',command))
+    valid=command in FIXED or bool(re.fullmatch(r'/教學 [1-6]',command)) or bool(re.fullmatch(r'/(?:對話保存|對話待辦|刪除記錄) [0-9a-f]{16}',command)) or bool(re.fullmatch(r'/(?:來源|來源暫停|來源恢復|來源移除確認|來源移除|來源改名) [0-9a-f]{16}',command)) or bool(re.fullmatch(r'/已處理 [A-Za-z0-9-]{1,80}',command))
     if not valid:return event
     if command in ('/行程開始','/行程結束'):
         value=event.get('postback',{}).get('params',{}).get('datetime','')
@@ -48,9 +48,12 @@ def save_wizard(elf,data):
     elf.db.execute('INSERT OR REPLACE INTO ui_sessions VALUES(1,?,?)',(json.dumps(data),time.time()+600))
 
 def normalize_text(elf,event):
+    if event.get('_capture_normalized'):return event
     if event.get('source',{}).get('type')!='user' or event.get('source',{}).get('userId')!=elf.owner_id:return event
     state=wizard(elf)
     text=event.get('message',{}).get('text','')
+    if state and state.get('capture') and text and not event.get('_native_type') and text not in ('/取消操作','/完成對話輸入'):
+        result=copy.deepcopy(event);result['_capture_normalized']=True;result['message']['text']=('/貼上對話 ' if state['capture']=='conversation' else '/記住內容 ')+text[:12001];return result
     if state and state.get('rename') and text and not text.startswith('/'):
         result=copy.deepcopy(event);result['message']['text']='/來源新名稱 '+text[:60];return result
     if state and state.get('step')=='title' and text and not text.startswith('/'):
@@ -69,6 +72,44 @@ def handle(elf,text,sid,kind):
         elf.db.execute('UPDATE known_groups SET owner_seen=1,present=1 WHERE id=?',(sid,))
         return ('已為你綁定這個群組，從現在開始收集新文字。請先取得成員同意；私事或 #private 開頭會排除。摘要只私訊你，其他人需各自開通。',False)
     if kind!='user':return None
+    if text=='/新手教學' or re.fullmatch(r'/教學 [1-6]',text):return ('請依教學卡片一步一步操作。',False)
+    if text in ('/整理雙人對話','/記一則'):
+        save_wizard(elf,{'capture':'conversation' if text=='/整理雙人對話' else 'note','parts':[]})
+        return ('請把要整理的對話文字貼上來。我會透過 OpenRouter 免費模型分析，只整理你提供的內容；不會自動讀取其他聊天室。十分鐘內有效。' if text=='/整理雙人對話' else '請直接回覆要記住的內容，會保存在你自己的記錄，保留三十天。十分鐘內有效。',False)
+    if text.startswith(('/貼上對話 ','/記住內容 ')):
+        state=wizard(elf);conversation=text.startswith('/貼上對話 ')
+        if not state or state.get('capture')!=('conversation' if conversation else 'note'):return ('這次輸入已過期，請重新按「整理雙人對話」或「記一則」。',False)
+        value=text.split(' ',1)[1]
+        if value.strip().startswith(('私事','#private')):return ('這段標記為私事，沒有保存或送 AI。其他對話仍可繼續傳。',False)
+        from dm_companion import remember,enqueue
+        if conversation:
+            parts=state.get('parts',[])
+            if len(parts)>=30 or sum(len(p['text']) for p in parts)+len(value)>12000:return ('已達這次收集上限，請先按「開始整理這些對話」，再開新的一次。',False)
+            mid=getattr(elf,'_command_mid',None) or str(uuid.uuid4())
+            if not any(p['id']==mid for p in parts):parts.append({'id':mid,'text':value})
+            state['parts']=parts;save_wizard(elf,state)
+            return ('已收到 '+str(len(parts))+' 段文字。你可以繼續轉傳／貼上，全部送完後按「開始整理這些對話」。尚未送 AI。',False)
+        elf.db.execute('DELETE FROM ui_sessions')
+        return (remember(elf,'記住 '+value,getattr(elf,'_command_mid',None) or 'note:'+str(uuid.uuid4())) or '沒有收到可保存的文字。',False)
+    if text=='/完成對話輸入':
+        state=wizard(elf);parts=state.get('parts',[]) if state else []
+        if not state or state.get('capture')!='conversation' or not parts:return ('目前還沒有收到對話文字。請先按「整理雙人對話」，再轉傳或貼上內容。',False)
+        from dm_companion import enqueue
+        reply=enqueue(elf,'\n'.join(p['text'] for p in parts),'batch:'+str(uuid.uuid4()),[p['id'] for p in parts]);elf.db.execute('DELETE FROM ui_sessions');return (reply,False)
+    if text=='/我的記錄':return ('以下是你自己明確要求保存的內容。',False)
+    if text.startswith('/刪除記錄 '):
+        elf.db.execute('DELETE FROM personal_notes WHERE id=?',(text.split(' ',1)[1],));return ('已移除這則記錄，不影響其他使用者。',False)
+    if text.startswith(('/對話保存 ','/對話待辦 ')):
+        cid=text.split(' ',1)[1];row=elf.db.execute("SELECT summary FROM conversation_imports WHERE id=? AND state='done' AND created>?",(cid,time.time()-86400)).fetchone()
+        if not row:return ('這份整理已過期，或不屬於你的帳號。',False)
+        data=json.loads(row[0])
+        if text.startswith('/對話保存 '):
+            elf.db.execute('INSERT OR IGNORE INTO personal_notes VALUES(?,?,?)',(cid,data['summary']+'\n'+'\n'.join(a['suggestion'] for a in data['actions']),time.time()));return ('已保存到你自己的記錄；不會自動寫入公事摘要或日曆。',False)
+        elf.db.execute('INSERT OR IGNORE INTO sources VALUES(?,?,0)',(elf.owner_id,'手動對話建議'))
+        for i,a in enumerate(data['actions']):
+            tid=hashlib.sha256((cid+str(i)).encode()).hexdigest()[:8]
+            elf.db.execute('INSERT OR IGNORE INTO tasks(id,message_id,source,summary,created) VALUES(?,?,?,?,?)',(tid,'conversation:'+cid+':'+str(i),elf.owner_id,a['suggestion'],time.time()))
+        return ('已把這份整理的 '+str(len(data['actions']))+' 項建議加入你的待辦；尚未新增日曆或發送訊息給他人。',False)
     if text=='/解除日曆':
         elf.db.execute('DELETE FROM calendar_tokens');elf.db.execute("DELETE FROM calendar_jobs WHERE state='pending'");return ('已清除你的本機日曆授權並停止尚未執行的要求。可至 Google 帳號的第三方連線頁撤銷雲端授權。',False)
     if text in ('/開始使用','/使用設定','/資料管理','/邀請教學','/行事曆','/連接行事曆','/解除日曆確認'):
@@ -132,8 +173,16 @@ def render(elf,event,text):
     if event.get('source',{}).get('type')!='user':return None
     cmd=event.get('message',{}).get('text','').strip()
     member=hasattr(elf,'member_key')
+    if cmd=='/新手教學' or re.fullmatch(r'/教學 [1-6]',cmd):return [ui.tutorial(int(cmd.split(' ')[1]) if cmd.startswith('/教學 ') else 1)]
+    if cmd.startswith('/貼上對話 '):return [ui.card('對話收集中','還有內容可以繼續傳',[text,'確認都送完後再按整理，這樣會把多則轉傳訊息一起理解。'],[ui.button('開始整理這些對話','/完成對話輸入',primary=True),ui.button('取消這次輸入','/取消操作')],'對話已收到，可繼續轉傳或開始整理')]
+    if cmd in ('/整理雙人對話','/記一則'):return [ui.card('直接回覆文字即可','貼上對話內容' if cmd=='/整理雙人對話' else '記一則自己的筆記',[text],[ui.button('取消這次輸入','/取消操作'),ui.button('看逐步教學','/教學 5' if cmd=='/整理雙人對話' else '/教學 6')],'請回覆要整理或保存的文字')]
+    if cmd=='/我的記錄':
+        rows=elf.db.execute('SELECT id,text FROM personal_notes ORDER BY created DESC LIMIT 10').fetchall()
+        if not rows:return [ui.card('我的記錄','還沒有保存的內容',['按「記一則」，或直接對小精靈說「幫我記住……」。'],[ui.button('記一則','/記一則',primary=True)],'目前沒有保存的記錄')]
+        bubbles=[ui.card('我的記錄',str(i+1)+' · 已保存',[r['text'][:2200]],[ui.button('刪除這則記錄','/刪除記錄 '+r['id']),ui.button('再記一則','/記一則')],'已保存的個人記錄')['contents'] for i,r in enumerate(rows)]
+        return [{'type':'flex','altText':'你自己的已保存記錄','contents':{'type':'carousel','contents':bubbles}}]
     if cmd in ('/開始使用','/開始','/說明'):
-        buttons=[ui.button('綁定工作群','/綁定群組',primary=True),ui.button('我的群組','/群組'),ui.button('待回覆','/待回覆'),ui.button('日曆與設定','/使用設定')]
+        buttons=[ui.button('第一次使用：逐步教學','/新手教學',primary=True),ui.button('整理雙人對話','/整理雙人對話'),ui.button('綁定與管理群組','/群組'),ui.button('記一則／我的記錄','/我的記錄'),ui.button('日曆與設定','/使用設定')]
         return [ui.card('你的工作入口','今天，想先整理什麼？',['群組摘要、待回覆、下一步都可以直接點選。','每位使用者的來源、待辦與日曆授權分開保存。'],buttons,'點選卡片開始使用')]
     if cmd=='/綁定群組':return [ui.pairing(text)]
     if cmd=='/邀請教學':return [ui.invitation()]
@@ -159,7 +208,7 @@ def render(elf,event,text):
         if member:
             automatic=elf.broker.parent.db.execute('SELECT automatic FROM public_members WHERE uid=?',(elf.owner_id,)).fetchone()[0]
             buttons.append(ui.button('關閉每日摘要' if automatic else '開啟每日摘要','/每日整理 '+('關閉' if automatic else '開啟')))
-        buttons += [ui.button('管理我的群組','/群組'),ui.button('資料管理','/資料管理'),ui.button('使用狀態','/狀態')]
+        buttons += [ui.button('逐步使用教學','/新手教學'),ui.button('整理雙人對話','/整理雙人對話'),ui.button('我的記錄','/我的記錄'),ui.button('管理我的群組','/群組'),ui.button('資料管理','/資料管理'),ui.button('使用狀態','/狀態')]
         return [ui.card('個人設定','把整理方式調成適合你。',[text],buttons,'管理日曆、群組與每日摘要')]
     if cmd=='/解除日曆確認':
         return [ui.card('解除日曆連線','要停止小精靈存取你的日曆嗎？',['只移除你自己的本機授權與尚未執行的要求，不刪除已建立的日曆活動。'],[ui.button('保留連線','/行事曆',primary=True),ui.button('確認解除我的連線','/解除日曆')],'確認解除個人日曆連線')]

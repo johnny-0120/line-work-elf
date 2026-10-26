@@ -15,6 +15,7 @@ def tool(name, description, properties=None, required=None):
 
 STRING = {'type':'string'}
 TOOLS = [
+    tool('read_saved_notes','搜尋使用者明確要求保存的個人記錄，與 Obsidian 不同；query空字串可列最近記錄。',{'query':STRING},['query']),
     tool('list_groups','查詢小精靈已知且擁有者出現過的 LINE 群組、名稱與收集狀態。'),
     tool('enable_group','啟用擁有者指定工作群組的後續文字收集；不會開啟電腦聊天室視窗。先 list_groups 再使用其中名稱；空名稱僅在唯一群組時可用。',{'query':STRING},['query']),
     tool('read_messages','搜尋最近七天已啟用來源的文字。query 空字串表示最近全部，不要把「最近」「訊息」當關鍵字。group 空字串表示全部來源，否則填群組名稱。不能讀未收集的紀錄。',{'query':STRING,'group':STRING},['query','group']),
@@ -50,6 +51,7 @@ SYSTEM = '''你是 LINE 公事小精靈的工具執行 agent，使用繁體中�
 def is_action_request(text):
     # High-confidence routing prevents the screenshot's exact failure even if
     # a free model incorrectly labels the request as an ordinary work note.
+    if re.search(r'我的記錄|之前.*(?:記住|記下)|記得我|保存的內容',text):return True
     if wants_advice(text) or re.search(r'obsidian|筆記|第二大腦',text,re.I):
         return True
     if re.search(r'群組|工作群|聊天室',text) and re.search(r'幫我|請|麻煩|啟用|開啟|打開|收集|讀取|查詢|有哪些|看看|幫忙',text):
@@ -134,7 +136,11 @@ def execute(elf, job, name, args):
         if old and name in MUTATING and name!='enable_group':
             return json.loads(old[0])
     text = job['text']
-    if name=='list_groups':
+    if name=='read_saved_notes':
+        with elf.lock:
+            rows=elf.db.execute('SELECT text FROM personal_notes WHERE text LIKE ? ORDER BY created DESC LIMIT 8',('%'+args['query']+'%',)).fetchall()
+        result={'ok':True,'message':('你保存的記錄：\n'+'\n'.join(r[0][:500] for r in rows)) if rows else '尚未找到符合的已保存記錄。'}
+    elif name=='list_groups':
         refresh_groups(elf)
         rows = groups(elf)
         result = {'ok':True,'message':('已知群組：\n'+'\n'.join(r['name']+('｜收集中' if r['enabled'] else '｜尚未收集') for r in rows[:20])) if rows else resolve_group(elf,'')[1],

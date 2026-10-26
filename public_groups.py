@@ -237,11 +237,17 @@ class PublicGroups:
                 continue
             text=event.get('message',{}).get('text','') if event.get('message',{}).get('type')=='text' else ''
             member=self.parent.db.execute('SELECT * FROM public_members WHERE uid=?',(uid,)).fetchone() if isinstance(uid,str) else None
+            if kind=='user' and member and event.get('type')=='message':
+                from interaction import normalize_text
+                event=normalize_text(self.open(uid,member['tenant']),event)
+                text=event.get('message',{}).get('text','')
             if kind=='user' and uid!=self.parent.owner_id:
                 if event.get('type')=='unfollow' and member:
                     self.forget(member['tenant'])
                 elif event.get('type')=='follow' or (text and not member):
-                    if text=='/同意並開始':
+                    if text=='/新手教學' or __import__('re').fullmatch(r'/教學 [1-6]',text):
+                        self.reply(event,'逐步使用教學',[ui.tutorial(int(text.split(' ')[1]) if text.startswith('/教學 ') else 1)])
+                    elif text=='/同意並開始':
                         maximum=max(1,min(100,int(os.getenv('PUBLIC_MAX_USERS','50'))))
                         if self.parent.db.execute('SELECT count(*) FROM public_members').fetchone()[0]>=maximum:
                             self.reply(event,'目前試用名額已滿，請稍後再試。')
@@ -265,13 +271,22 @@ class PublicGroups:
                 elif member and text=='/刪除我的資料':
                     self.forget(member['tenant'])
                     self.reply(event,'你的群組綁定、訊息、摘要與待辦已從本機清除，已停止使用。已送出的 LINE 訊息、第三方服務紀錄與既有備份不會因此撤回；不影響其他人。')
-                elif member and event.get('type')=='message':
+                elif member and event.get('type') in ('message','unsend'):
                     child=self.open(uid,member['tenant'])
                     from interaction import wizard
-                    if text.startswith('/') or wizard(child):
+                    if event.get('type')=='unsend':
+                        body=event_body(event);child.ingest(body,base_signature(body))
+                    elif text.startswith('/') or wizard(child):
                         body=event_body(event)
                         result=child.ingest(body,base_signature(body))
                         trigger=trigger or result['run']
+                    elif text and __import__('dm_companion').REMEMBER.match(text):
+                        with child.lock:
+                            note=__import__('dm_companion').remember(child,text,event['message']['id']);child.db.commit()
+                        self.reply(event,note,[ui.text_message(note)])
+                    elif event.get('message',{}).get('type')!='text':
+                        note='收到附件。目前先支援貼上的對話文字，還不會直接解析附件。請按「開始使用 → 整理雙人對話」；逐步教學第5步有操作說明。'
+                        self.reply(event,note,[ui.text_message(note)])
                     elif text:
                         notice='多人版不收集或分析一般私訊。你可以按下方按鈕操作，或從底部選單開始。'
                         self.reply(event,notice,[ui.text_message(notice)])
@@ -416,6 +431,7 @@ class PublicGroups:
                 if len(parts)!=3 or parts[0]!='mt' or parts[1] not in self.children: raise Problem(403,'Invalid member scope.')
                 key=parts[1]
                 row=self.children[key].db.execute("SELECT 1 FROM jobs WHERE id=? AND state='pending'",(parts[2],)).fetchone()
+                row=row or self.children[key].db.execute("SELECT 1 FROM conversation_imports WHERE id=? AND state='pending'",(parts[2],)).fetchone()
                 if not row: raise Problem(403,'Member job is no longer active.')
                 if self.used(key)>=self.user_limit or self.total()>=self.public_limit:
                     raise Problem(429,'Member daily free-AI allowance reached; retry next UTC day.')
@@ -437,6 +453,8 @@ class PublicGroups:
             child.background_once()
         finally:
             child.lock.release()
+        from dm_companion import process_one as process_conversation
+        if self.children.get(child.member_key) is child:process_conversation(child)
 
     def close(self):
         for child in self.children.values(): child.db.close()

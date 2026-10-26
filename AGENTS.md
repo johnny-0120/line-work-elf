@@ -19,3 +19,5 @@ Do not start services, install a supervisor, connect a personal account or run
 real LINE/Calendar requests as part of automated verification.
 
 Member Calendar is now opt-in via member_calendar.py/member_oauth.py. Each grant stays in that member SQLite calendar_tokens table. Never use owner GoogleCalendar or Obsidian context for members. Preserve signed button actor checks, browser-bound OAuth state + PKCE, one-use tickets, and the relay endpoint allowlist. No real member authorization may be performed without that person.
+
+Manual conversations use dm_companion.py, explicitly completed input buffers and per-member model budgets. Keep personal_notes separate from daily work messages. Never treat forwarded slash commands as operations while capturing. Preserve conversation_parts withdrawal cleanup, exact-evidence validation and explicit save/task buttons. Import analysis must not load owner Obsidian or Calendar.

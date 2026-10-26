@@ -148,6 +148,8 @@ class Elf:
             deliveries INTEGER,destination_verified INTEGER,redelivery INTEGER,disposition TEXT,
             actor_is_owner INTEGER,PRIMARY KEY(event_id,payload_hash));
         ''')
+        from dm_companion import init as init_companion
+        init_companion(self.db)
         if 'owner_mentioned' not in {row[1] for row in self.db.execute('PRAGMA table_info(messages)')}:
             self.db.execute('ALTER TABLE messages ADD COLUMN owner_mentioned INTEGER DEFAULT 0')
             self.db.commit()
@@ -286,6 +288,8 @@ class Elf:
                     self.db.execute('DELETE FROM tasks WHERE message_id=?', (mid,))
                     self.erase_snapshots(message_id=mid)
                     self.db.execute('DELETE FROM assistant_jobs WHERE id=?', (mid,))
+                    from dm_companion import withdraw
+                    withdraw(self,mid)
                     self.db.execute('DELETE FROM agent_actions WHERE job_id=?', (mid,))
                     self.db.execute('DELETE FROM proposals WHERE message_id=?', (mid,))
                     self.db.execute('DELETE FROM assistant_context')
@@ -303,12 +307,16 @@ class Elf:
                     msg = event.get('message', {})
                     text = msg.get('text', '').strip() if msg.get('type') == 'text' else ''
                     reply = None
+                    if msg.get('type')!='text' and uid==owner and source.get('type')=='user':
+                        reply='收到附件。目前此版本還不會直接解析圖片、語音或聊天文字檔；請按「開始使用 → 整理雙人對話」，把要整理的文字貼上。新手教學第5步有說明。'
                     if text == '/我的ID' and (not owner or uid == owner):
                         disposition='owner_command'
                         reply = '你的 LINE user ID：' + uid + '\n請填入本機 .env 的 LINE_OWNER_USER_ID。'
                     elif owner and uid == owner and text.startswith('/'):
                         disposition='owner_command'
-                        reply, should_run = self.command(text, sid, source.get('type'))
+                        self._command_mid=msg['id']
+                        try:reply, should_run = self.command(text, sid, source.get('type'))
+                        finally:self._command_mid=None
                         trigger = trigger or should_run
                     elif text and not text.startswith(('私事', '#private', '/')):
                         enabled = self.db.execute('SELECT enabled FROM sources WHERE id=?', (sid,)).fetchone()
@@ -326,8 +334,15 @@ class Elf:
                                 if reply:
                                     accepted = False
                                 else:
-                                    enqueue(self, msg['id'], text, int(event.get('timestamp', time.time()*1000)))
-                                    disposition='owner_ai_queued'
+                                    from dm_companion import remember,looks_like_conversation,enqueue as capture_conversation
+                                    reply=remember(self,text,msg['id'])
+                                    if reply:
+                                        disposition='explicit_private_note'
+                                    elif looks_like_conversation(text):
+                                        reply=capture_conversation(self,text,msg['id']);disposition='manual_conversation'
+                                    else:
+                                        enqueue(self, msg['id'], text, int(event.get('timestamp', time.time()*1000)))
+                                        disposition='owner_ai_queued'
                         if accepted:
                             disposition='collected'
                             if source.get('type') == 'user':
@@ -527,6 +542,9 @@ class Elf:
         self.db.execute('DELETE FROM assistant_jobs WHERE created<?', (cutoff,))
         self.db.execute('DELETE FROM agent_actions WHERE created<?', (cutoff,))
         self.db.execute('DELETE FROM proposals WHERE created<?', (time.time()-86400,))
+        self.db.execute('DELETE FROM personal_notes WHERE created<?',(time.time()-30*86400,))
+        self.db.execute('DELETE FROM conversation_imports WHERE created<?',(time.time()-86400,))
+        self.db.execute('DELETE FROM conversation_parts WHERE cid NOT IN (SELECT id FROM conversation_imports)')
         self.db.execute('DELETE FROM assistant_context WHERE created<?', (time.time()-3600,))
         self.db.commit()
 
@@ -577,6 +595,9 @@ class Elf:
     def background_once(self):
         if self.public:
             self.public.background_once()
+        if not hasattr(self,'member_key'):
+            from dm_companion import process_one as process_conversation
+            process_conversation(self)
         # Network calls run outside the database lock, so LINE webhooks stay fast.
         from calendar_client import GoogleCalendar, CalendarError
         from calendar_actions import execute
