@@ -23,8 +23,8 @@ HELP = ('多人群組整理：\n'
         '/每日整理 開啟（或關閉）：台北時間 21:00 後自動整理。預設關閉。\n'
         '群內 /暫停收集、/停止收集 只影響你自己的收集；私訊 /解除群組 名稱 可移除。\n'
         '/刪除我的資料：停止使用並清除本機帳戶資料。\n'
-        '多人版不分析一般私訊、不讀取管理者的筆記或日曆。可在「使用設定」另外連接自己的 Google Calendar。')
-CONSENT = ('群組文字會經 OpenRouter 與免費模型供應者分析，摘要與待辦私訊你本人。'
+        '可在「使用設定」自選開啟智慧私訊助理與自己的 Google Calendar；不讀取管理者的筆記或日曆。')
+CONSENT = ('群組文字會經 OpenRouter 與模型供應者分析，摘要與待辦私訊你本人。'
            '請先取得群組成員同意；不要加入敏感對話。'
            '「私事」或 #private 開頭不送 AI，其餘私事過濾仍可能有誤。'
            '訊息與摘要工作紀錄保留最多七天，待辦約三十天；各人的資料獨立儲存，'
@@ -86,7 +86,7 @@ class MemberElf(Elf):
             if not text.startswith('/綁定群組 ') and not self.db.execute('SELECT 1 FROM group_bindings WHERE id=?',(sid,)).fetchone():
                 return '請先私訊 /綁定群組，取得你自己的代碼後由你本人貼在這裡。',False
             if text.startswith('/綁定群組 ') and not self.db.execute('SELECT 1 FROM sources WHERE id=?',(sid,)).fetchone():
-                if self.db.execute('SELECT count(*) FROM sources').fetchone()[0]>=5:
+                if self.db.execute('SELECT count(*) FROM group_bindings').fetchone()[0]>=5:
                     return '每人最多綁定五個群組；請先私訊 /解除群組 名稱。',False
             # Existing members cannot silently advance the evidence boundary by
             # re-pairing. A fresh binding after removal starts an empty source.
@@ -125,10 +125,10 @@ class MemberElf(Elf):
             pending=self.db.execute('SELECT count(*) FROM messages WHERE seen=0').fetchone()[0]
             automatic=self.broker.parent.db.execute('SELECT automatic FROM public_members WHERE uid=?',(self.owner_id,)).fetchone()[0]
             used=self.broker.used(self.member_key)
-            return f'你的群組：{groups} 個收集中；尚有 {pending} 則新文字。\n每日整理：'+('開啟' if automatic else '關閉')+f'\n今日 AI 請求：{used}/{self.broker.user_limit}（UTC 日界）。\n各人資料獨立；只使用免費模型。',False
+            return f'你的群組：{groups} 個收集中；尚有 {pending} 則新文字。\n每日整理：'+('開啟' if automatic else '關閉')+f'\n今日 AI 請求：{used}/{self.broker.user_limit}（台北時間每日08:00重置）。\n各人資料獨立；目前免費使用。',False
         if text in ('/綁定群組','/整理','/立即整理','/待回覆','/群組') or text.startswith('/已處理 '):
             if text in ('/整理','/立即整理') and (self.broker.used(self.member_key)>=self.broker.user_limit or self.broker.total()>=self.broker.public_limit):
-                return '今日免費 AI 整理額度已用完（UTC 日界），文字仍保留；額度重置後可再傳 /整理。沒有切換付費模型。',False
+                return '今日處理額度已用完（台北時間每日08:00重置），文字仍保留；額度重置後可再傳 /整理。不會因此收費。',False
             result,run=super().command(text,sid,source_type)
             if text in ('/整理','/立即整理') and not self.has_pending_content():
                 return '你目前沒有待整理的群組文字。請先綁定群組，並在綁定後傳入新訊息。',False
@@ -276,7 +276,7 @@ class PublicGroups:
                     from interaction import wizard
                     if event.get('type')=='unsend':
                         body=event_body(event);child.ingest(body,base_signature(body))
-                    elif text.startswith('/') or wizard(child):
+                    elif text.startswith('/') or (wizard(child) and (wizard(child).get('capture') or wizard(child).get('rename') or wizard(child).get('step')=='title')):
                         body=event_body(event)
                         result=child.ingest(body,base_signature(body))
                         trigger=trigger or result['run']
@@ -288,8 +288,12 @@ class PublicGroups:
                         note='收到附件。目前先支援貼上的對話文字，還不會直接解析附件。請按「開始使用 → 整理雙人對話」；逐步教學第5步有操作說明。'
                         self.reply(event,note,[ui.text_message(note)])
                     elif text:
-                        notice='多人版不收集或分析一般私訊。你可以按下方按鈕操作，或從底部選單開始。'
-                        self.reply(event,notice,[ui.text_message(notice)])
+                        from member_assistant import enabled,enqueue
+                        with child.lock:
+                            if enabled(child):
+                                notice=enqueue(child,event);child.db.commit()
+                            else:notice='想要直接聊天或用自然語言查資料，請先開啟智慧私訊；也可使用下方對話整理與記錄功能。'
+                        if notice:self.reply(event,notice,[ui.card('你想怎麼處理？','選擇一個入口',[notice],[ui.button('智慧私訊助理','/私訊助理',primary=True),ui.button('整理雙人對話','/整理雙人對話'),ui.button('記一則','/記一則')],notice)])
             elif kind in ('group','room'):
                 if event.get('type')=='join':
                     self.reply(event,'小精靈已加入。每位成員請各自開啟我的私訊，按「開始使用」；不會自動收集任何人的訊息。',[ui.invitation(group=True)])
@@ -432,6 +436,7 @@ class PublicGroups:
                 key=parts[1]
                 row=self.children[key].db.execute("SELECT 1 FROM jobs WHERE id=? AND state='pending'",(parts[2],)).fetchone()
                 row=row or self.children[key].db.execute("SELECT 1 FROM conversation_imports WHERE id=? AND state='pending'",(parts[2],)).fetchone()
+                row=row or self.children[key].db.execute("SELECT 1 FROM assistant_jobs WHERE id=? AND state='pending'",(parts[2],)).fetchone()
                 if not row: raise Problem(403,'Member job is no longer active.')
                 if self.used(key)>=self.user_limit or self.total()>=self.public_limit:
                     raise Problem(429,'Member daily free-AI allowance reached; retry next UTC day.')
@@ -454,7 +459,11 @@ class PublicGroups:
         finally:
             child.lock.release()
         from dm_companion import process_one as process_conversation
-        if self.children.get(child.member_key) is child:process_conversation(child)
+        if self.children.get(child.member_key) is child:
+            processed=process_conversation(child)
+            if not processed:
+                from member_assistant import process_one as process_member_dm
+                process_member_dm(child)
 
     def close(self):
         for child in self.children.values(): child.db.close()

@@ -417,7 +417,7 @@ class Elf:
             self.db.execute('INSERT OR REPLACE INTO sources VALUES(?,?,1)',(sid,name))
             self.db.execute('INSERT OR REPLACE INTO group_bindings VALUES(?,?,?)',(sid,'one_time_code',time.time()))
             self.db.execute('UPDATE known_groups SET owner_seen=1,present=1 WHERE id=?',(sid,))
-            notice='已核對你的單次綁定代碼，啟用這個對話的新文字收集。每日摘要只私訊擁有者；私事或 #private 開頭會排除。\n群組文字會交給 OpenRouter 免費 AI 分析，/暫停收集 可暫停。'
+            notice='已核對你的單次綁定代碼，啟用這個對話的新文字收集。每日摘要只私訊擁有者；私事或 #private 開頭會排除。\n群組文字會交給 外部 AI 服務 分析，/暫停收集 可暫停。'
             key=str(uuid.uuid5(uuid.NAMESPACE_URL,'pairing:'+hashed))
             self.db.execute('INSERT OR IGNORE INTO outbox(id,text,created) VALUES(?,?,?)',
                 (key,'群組綁定完成：已收到你本人在目標對話貼上的同一組代碼，該對話現已啟用新文字收集。你可以在群內用 /工作群組 自訂名稱 設定容易辨認的名稱。',time.time()))
@@ -429,7 +429,7 @@ class Elf:
             self.db.execute('INSERT OR REPLACE INTO sources VALUES(?,?,1)', (sid, name))
             self.db.execute('INSERT OR REPLACE INTO group_bindings VALUES(?,?,?)',(sid,'owner_group_command',time.time()))
             self.db.execute('UPDATE known_groups SET name=?,owner_seen=1,present=1,refreshed=? WHERE id=?',(name,time.time(),sid))
-            return '已啟用「' + name + '」公事整理。從現在起收集文字訊息，交由 OpenRouter 免費模型分析；每日摘要只私訊擁有者。私事請以「私事」開頭；/停止收集 可停止並刪除此群已存資料。', False
+            return '已啟用「' + name + '」公事整理。從現在起收集文字訊息，交由 外部 AI 服務分析；每日摘要只私訊擁有者。私事請以「私事」開頭；/停止收集 可停止並刪除此群已存資料。', False
         if text == '/停止收集':
             self.purge_source(sid)
             return '已停止收集並刪除此對話的訊息與待辦。已傳出的摘要無法撤回。', False
@@ -524,7 +524,7 @@ class Elf:
                 monitor='\n常駐監控：'+('正常' if age<120 else '需檢查')+f'（{age} 秒前）'+ '\nLINE 入口：'+('已驗證' if info.get('webhook_verified') else '連線恢復中')
             except (OSError,ValueError,KeyError,TypeError):
                 monitor='\n常駐監控：尚無狀態紀錄。'
-            return f'已啟用 {count} 個來源，尚有 {pending} 則公事待整理，{jobs} 份摘要尚未完成，{understanding} 則私訊待 AI 理解。AI 僅使用免費模型；每日台北時間 21:00 整理。私訊可直接傳文字，不必加「公事：」。'+monitor, False
+            return f'已啟用 {count} 個來源，尚有 {pending} 則公事待整理，{jobs} 份摘要尚未完成，{understanding} 則私訊待 AI 理解。目前免費使用；每日台北時間 21:00 整理。私訊可直接傳文字，不必加「公事：」。'+monitor, False
         return '直接傳文字即可：我會辨識公事、待辦與行程。時間不足會追問，暫定安排先給建議。\n/整理：立即整理\n/待回覆：查看待辦\n/已處理 編號：完成待辦\n/狀態、/群組：收集狀態\n/行事曆：連線方式\n/行程 今天（或明天、本週）\n/確認行程 編號：採用建議\n/取消行程 編號：取消建議\n/暫停私訊辨識、/恢復私訊辨識\n「私事」或 #private 開頭不送 AI。群組用 /工作群組 名稱 啟用、/停止收集 刪除資料。', False
 
     def prune(self):
@@ -546,6 +546,7 @@ class Elf:
         self.db.execute('DELETE FROM personal_notes WHERE created<?',(time.time()-30*86400,))
         self.db.execute('DELETE FROM conversation_imports WHERE created<?',(time.time()-86400,))
         self.db.execute('DELETE FROM conversation_parts WHERE cid NOT IN (SELECT id FROM conversation_imports)')
+        self.db.execute('DELETE FROM conversation_leases WHERE until<?',(time.time()-86400,))
         self.db.execute('DELETE FROM assistant_context WHERE created<?', (time.time()-3600,))
         self.db.commit()
 

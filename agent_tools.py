@@ -350,7 +350,7 @@ def process(elf, job, history=None):
                            ('pending' if tries<3 else 'failed',tries,time.time()+900,job['id']))
             if tries==1 or tries>=3:
                 notice(elf,job['id']+':agent-error:'+str(tries),
-                       '免費 AI 暫時忙碌，或回答未通過引用檢查；尚未完成這個請求。'+
+                       'AI 服務暫時忙碌，或回答未通過引用檢查；尚未完成這個請求。'+
                        ('已保留，15 分鐘後自動重試。' if tries<3 else '三次嘗試仍未完成，可稍後傳 /重試理解。'))
             elf.db.commit()
             return True

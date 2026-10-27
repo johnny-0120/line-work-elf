@@ -74,7 +74,8 @@ def handle(h,method):
             if not secrets.compare_digest(form.get('csrf',[''])[0],session['csrf']) or session['phase']!='confirm':raise ValueError()
             origin=h.headers.get('Origin')
             # Relay supplies the original browser origin; no foreign website may submit.
-            if origin!=os.environ.get('WEBHOOK_URL','').rstrip('/'):raise ValueError()
+            from live_settings import public_base
+            if origin!=public_base():raise ValueError()
             client=web_client();verifier=secrets.token_urlsafe(48);state=secrets.token_urlsafe(32)
             with lock:session.update(phase='google',state=state,verifier=verifier)
             challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()

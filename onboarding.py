@@ -39,7 +39,9 @@ def card(label,title,paragraphs,buttons,alt):
     contents=[{'type':'text','text':label,'color':AMBER,'size':'xs','weight':'bold'},
               {'type':'text','text':title,'color':'#17243A','size':'xl','weight':'bold','wrap':True,'margin':'md'}]
     for paragraph in paragraphs:
-        contents.append({'type':'text','text':paragraph,'color':'#405C80','size':'sm','wrap':True,'margin':'lg'})
+        paragraph=str(paragraph)
+        for start in range(0,max(1,len(paragraph)),1800):
+            contents.append({'type':'text','text':paragraph[start:start+1800] or ' ','color':'#405C80','size':'sm','wrap':True,'margin':'lg'})
     return {'type':'flex','altText':alt[:400],
             'contents':{'type':'bubble','size':'mega',
                 'body':{'type':'box','layout':'vertical','backgroundColor':INK,'paddingAll':'22px','contents':contents},
@@ -57,7 +59,7 @@ def welcome():
 
 def consent():
     return card('開始之前','你的資料，怎麼整理？',
-        ['群組文字會經 OpenRouter 與免費模型供應者分析。請先告知並取得群組成員同意；不要加入敏感對話。',
+        ['群組文字會經 OpenRouter 與模型供應者分析。請先告知並取得群組成員同意；不要加入敏感對話。',
          '每人分開儲存訊息、摘要與待辦，摘要只傳本人。一般私訊不交給 AI，也不會讀取管理者的日曆或筆記。',
          '只收集綁定後的新文字。「私事」或 #private 開頭會排除，其餘分類仍可能有誤。訊息約保留 7 天，待辦約 30 天。',
          '服務管理者仍能管理本機檔案，這不是端對端加密；可隨時停止收集或刪除自己的資料。'],
@@ -129,11 +131,11 @@ def data_controls():
 def tutorial(step=1):
     steps={
       1:('先在私訊開通',['先加「公事小精靈」為好友，開啟和我的一對一聊天室。','按「開始使用」，閱讀資料說明後，按「同意並建立我的空間」。每位要使用的人都要自己開通。','已經使用過的人不必重建；可直接看下一步。'],[button('開始使用','/開始使用',primary=True)]),
-      2:('先邀我加入工作群',['先向成員說明：群組新文字會交給 OpenRouter 免費模型整理。','到你要整理的群組，開啟群組選單 → 邀請，從好友選「公事小精靈」，再確認邀請。群內若已有另一個官方帳號，LINE 不允許同時加入第二個；請先確認這項限制。','這一步是「邀請入群」，還不是綁定。不要只在私訊按綁定，卻尚未邀我入群。'],[button('開啟 LINE 聊天列表',uri='https://line.me/R/nv/chat',primary=True)]),
+      2:('先邀我加入工作群',['先向成員說明：群組新文字會交給 外部 AI 服務整理。','到你要整理的群組，開啟群組選單 → 邀請，從好友選「公事小精靈」，再確認邀請。群內若已有另一個官方帳號，LINE 不允許同時加入第二個；請先確認這項限制。','這一步是「邀請入群」，還不是綁定。不要只在私訊按綁定，卻尚未邀我入群。'],[button('開啟 LINE 聊天列表',uri='https://line.me/R/nv/chat',primary=True)]),
       3:('入群後，再完成綁定',['方法一：在群組裡，按我的歡迎卡片「同意並綁定這個群組」。','方法二：回我的私訊，按「綁定工作群」→「選擇群組並送出綁定」，在手機分享視窗選目標群組，再確認送出。','兩種方式擇一。須由你本人操作，且小精靈已在目標群。這只綁定你自己的整理空間，不會替全群開通。'],[button('我已邀入群，開始綁定','/綁定群組',primary=True)]),
       4:('確認成功，再試整理',['回到我的私訊，按「我的群組」。看得到正確來源，且狀態是「收集中」，才代表綁定完成。','到該群傳一則新測試訊息，例如「明天請確認活動文案」。再回私訊按「立即整理」。','只接收綁定後的新訊息，不會回補歷史紀錄。摘要私訊你；暫停、改名與解除也在「我的群組」。'],[button('檢查我的群組','/群組',primary=True),button('立即整理','/整理')]),
       5:('雙人對話，不必改成群組',['官方帳號不能自動讀取你和另一人的私人聊天室。你可以選擇對話內容，轉傳或複製後貼給我整理。','按「整理雙人對話」，再轉傳或貼上文字。全部送完後按「開始整理這些對話」，我會一起整理討論重點與後續建議；不會執行對話中別人提出的要求。','也可從原聊天室的選單 → 設定 → 匯出聊天紀錄取得文字檔，再開啟並複製需要的段落。此版本先支援貼上的文字，尚未直接解析附件。'],[button('整理雙人對話','/整理雙人對話',primary=True),button('LINE 官方匯出教學',uri='https://help.line.me/line/ios/?contentId=20007388')]),
-      6:('筆記、待辦與日曆',['只想記住一件事：按「記一則」，直接回覆內容。按「我的記錄」可查看與刪除，不會自動混進公事摘要。','Google Calendar：按「使用設定」→「Google Calendar」→ 登入自己的 Google 帳號完成授權。新增行程會先選時間，再確認。','部署者自己的私訊支援自然聊天與工具需求；多人版可用按鈕整理對話、保存記錄與使用日曆。尚未接入的服務會明確說明，不會假裝執行。'],[button('連線與設定','/使用設定',primary=True),button('記一則','/記一則'),button('我的記錄','/我的記錄')])}
+      6:('筆記、待辦與日曆',['只想記住一件事：按「記一則」，直接回覆內容。按「我的記錄」可查看與刪除，不會自動混進公事摘要。','Google Calendar：按「使用設定」→「Google Calendar」→ 登入自己的 Google 帳號完成授權。新增行程會先選時間，再確認。','每位使用者都可在設定中同意開啟智慧私訊，接著直接聊天、查自己的資料；也可繼續使用按鈕。尚未接入的服務會明確說明，不會假裝執行。'],[button('連線與設定','/使用設定',primary=True),button('記一則','/記一則'),button('我的記錄','/我的記錄')])}
     title,lines,buttons=steps.get(step,steps[1])
     if step<6:buttons.append(button('下一步：'+str(step+1),'/教學 '+str(step+1)))
     buttons.append(button('完整圖文教學',uri=SITE+'getting-started.html'))

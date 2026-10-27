@@ -25,6 +25,13 @@ class MemberCalendar(GoogleCalendar):
     def saved(self):
         row=self.elf.db.execute('SELECT data FROM calendar_tokens WHERE id=1').fetchone()
         return json.loads(row[0]) if row else {}
+    def replace_if_current(self,previous,data):
+        row=self.elf.db.execute('SELECT data FROM calendar_tokens WHERE id=1').fetchone()
+        if not row or json.loads(row[0])!=previous:raise CalendarError('日曆連線已解除或更新，請重新操作。')
+        cur=self.elf.db.execute('UPDATE calendar_tokens SET data=? WHERE id=1 AND data=?',(json.dumps(data),row[0]))
+        self.elf.db.commit()
+        if not cur.rowcount:raise CalendarError('日曆連線已解除或更新，請重新操作。')
+
     def save(self,data):
         self.elf.db.execute('INSERT OR REPLACE INTO calendar_tokens VALUES(1,?)',(json.dumps(data),));self.elf.db.commit()
     def status(self):
@@ -40,20 +47,21 @@ class MemberCalendar(GoogleCalendar):
             client=web_client()
             try:fresh=exchange({'grant_type':'refresh_token','client_id':client['client_id'],'client_secret':client['client_secret'],'refresh_token':saved['refresh_token']})
             except CalendarError as exc:
-                if exc.code=='invalid_grant':self.save({**saved,'authorization_error':'invalid_grant'})
+                if exc.code=='invalid_grant':self.replace_if_current(saved,{**saved,'authorization_error':'invalid_grant'})
                 raise CalendarError('你的日曆授權需要重新連線，請回 Google Calendar 卡片操作。') from None
-            self.save({**saved,**fresh,'expires_at':time.time()+int(fresh.get('expires_in',3600)),'authorization_error':None})
+            self.replace_if_current(saved,{**saved,**fresh,'expires_at':time.time()+int(fresh.get('expires_in',3600)),'authorization_error':None})
             return fresh['access_token']
     def calendar_path(self):return '/calendar/v3/calendars/primary'
     def busy(self,start,end):
         data=self.api('POST','/calendar/v3/freeBusy',{'timeMin':start,'timeMax':end,'items':[{'id':'primary'}]})
-        result=data.get('calendars',{}).get('primary',{})
-        if result.get('errors'):raise CalendarError('無法確認你的日曆空閒時間。')
+        result=data.get('calendars',{}).get('primary')
+        if not isinstance(result,dict) or result.get('errors'):raise CalendarError('無法確認你的日曆空閒時間。')
         return result.get('busy',[])
 
 def link(elf):
     web_client()
-    base=os.getenv('WEBHOOK_URL','').rstrip('/')
+    from live_settings import public_base
+    base=public_base()
     if not base.startswith('https://'):raise CalendarError('日曆公開入口尚未準備好。')
     tenant=elf.member_key
     nonce=secrets.token_hex(16);expiry=str(int(time.time()+600))

@@ -4,7 +4,8 @@ import hashlib,json,re,time,uuid
 REMEMBER=re.compile(r'^(?:請|麻煩)?(?:幫我|替我)?(?:記住|記下|記起來|保存|記錄)(?:一下)?[：:\s]*(.+)$',re.S)
 
 def init(db):
-    db.executescript('''CREATE TABLE IF NOT EXISTS personal_notes(id TEXT PRIMARY KEY,text TEXT,created REAL);
+    db.executescript('''CREATE TABLE IF NOT EXISTS conversation_leases(id TEXT PRIMARY KEY,until REAL);
+    CREATE TABLE IF NOT EXISTS personal_notes(id TEXT PRIMARY KEY,text TEXT,created REAL);
     CREATE TABLE IF NOT EXISTS conversation_imports(id TEXT PRIMARY KEY,text TEXT,summary TEXT,state TEXT,created REAL);
     CREATE TABLE IF NOT EXISTS conversation_parts(cid TEXT,message_id TEXT,PRIMARY KEY(cid,message_id));''')
 
@@ -39,6 +40,9 @@ def process_one(elf):
     with elf.lock:
         row=elf.db.execute("SELECT * FROM conversation_imports WHERE state='pending' ORDER BY created LIMIT 1").fetchone()
         if not row:return False
+        lease=elf.db.execute('INSERT INTO conversation_leases VALUES(?,?) ON CONFLICT(id) DO UPDATE SET until=excluded.until WHERE until<?',(row['id'],time.time()+150,time.time()))
+        elf.db.commit()
+        if not lease.rowcount:return False
     prompt={'text':row['text']}
     if hasattr(elf,'member_key'):prompt['public_job_id']=elf.broker.wrap(elf.member_key,row['id'])
     try:
@@ -61,8 +65,12 @@ def process_one(elf):
     except Exception:
         with elf.lock:
             if hasattr(elf,'member_key') and elf.broker.children.get(elf.member_key) is not elf:return True
+            if not elf.db.execute('SELECT 1 FROM conversation_imports WHERE id=?',(row['id'],)).fetchone():return True
             elf.db.execute("UPDATE conversation_imports SET state='failed' WHERE id=?",(row['id'],))
-            notice(elf,'conversation:'+row['id'],'這次對話整理尚未完成，可能是免費額度或模型暫時忙碌。內容暫留二十四小時；可按「整理雙人對話」重新貼上。沒有建立待辦或日曆。');elf.db.commit()
+            import onboarding as ui
+            message='這次整理尚未完成，原文仍暫存二十四小時。可按下方重試，不必重貼；沒有建立待辦或日曆。'
+            card=ui.card('整理暫時未完成','你的內容仍保留',[message],[ui.button('重試這份整理','/重試對話 '+row['id'],primary=True),ui.button('查看方案與用量','/我的方案')],message)
+            elf.db.execute('INSERT OR IGNORE INTO outbox(id,text,created,messages_json) VALUES(?,?,?,?)',('conversation-error:'+row['id'],message,time.time(),json.dumps([card],ensure_ascii=False)));elf.db.commit()
     return True
 
 
@@ -77,6 +85,7 @@ def withdraw(elf,mid):
     for cid in cids:
         elf.db.execute('DELETE FROM personal_notes WHERE id=?',(cid,))
         elf.db.execute('DELETE FROM conversation_imports WHERE id=?',(cid,))
+        elf.db.execute('DELETE FROM conversation_leases WHERE id=?',(cid,))
         elf.db.execute('DELETE FROM conversation_parts WHERE cid=?',(cid,))
         elf.db.execute('DELETE FROM tasks WHERE message_id LIKE ?',('conversation:'+cid+':%',))
         elf.db.execute('DELETE FROM outbox WHERE id=?',('conversation:'+cid,))

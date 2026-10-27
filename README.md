@@ -4,7 +4,9 @@
 
 ![公事小精靈工具介紹](docs/presentation/slides/01.png)
 
-這是可自行部署的個人助理，也能選用多人群組整理模式。部署者準備 LINE 官方帳號與 OpenRouter key，受邀者共用機器人入口，各自綁定群組、各自收到摘要。每人可另外授權自己的日曆，私人筆記與一般私訊 Agent 仍只供部署者本人使用；本倉庫不包含帳號、訊息、資料庫或筆記。
+這是可自行部署的個人助理，也能選用多人群組整理模式。部署者準備 LINE 官方帳號與 OpenRouter key，受邀者共用機器人入口，各自綁定群組、各自收到摘要。每人可另外授權自己的日曆，個人記錄與自選的智慧私訊助理也各自隔離，Obsidian 背景工具只供部署者本人使用；本倉庫不包含帳號、訊息、資料庫或筆記。
+
+[一般使用者圖文教學](https://johnny-0120.github.io/line-work-elf/getting-started.html) · [功能現況與後續規劃](docs/PRODUCT_PLAN.md) · [Claude 接手說明](CLAUDE.md)
 
 [多人群組整理：加入、隔離與管理方式](docs/multi-user.md)
 

@@ -215,7 +215,7 @@ def process_one(elf):
                 return True
             tries = job['attempts']+1
             elf.db.execute("UPDATE assistant_jobs SET attempts=?,next_try=?,state=? WHERE id=?", (tries,time.time()+900,'pending' if tries<3 else 'failed',job['id']))
-            notice(elf, job['id']+':error', '免費 AI 暫時忙碌或解析未通過檢查，這則訊息尚未處理，沒有新增行程。會保留並重試；也可稍後傳 /重試理解。')
+            notice(elf, job['id']+':error', 'AI 服務暫時忙碌或解析未通過檢查，這則訊息尚未處理，沒有新增行程。會保留並重試；也可稍後傳 /重試理解。')
             elf.db.commit()
         return True
     if data['intent']=='agent':

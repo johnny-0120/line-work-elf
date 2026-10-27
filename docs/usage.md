@@ -2,7 +2,7 @@
 
 [專案首頁與安裝](../README.md) · [10 頁圖文介紹](presentation/README.md) · [資料流程](architecture.md)
 
-這份教學從「自己的小精靈已部署、n8n 工作流已發布、Webhook 已接通」開始。尚未部署時，先完成[安裝步驟](../README.md#開始前)。作者目前沒有提供共用服務，加入作者的官方帳號不會自動取得自己的助理。
+一般使用者請先看[加入與綁定圖文教學](https://johnny-0120.github.io/line-work-elf/getting-started.html)，共用機器人不必自行部署。以下保留自行架設者的管理與排查步驟。
 
 ## 第一次使用：讓它收到正確群組
 
