@@ -1,3 +1,0 @@
-# The core service and offline tests use Python's standard library.
-# Pillow is used only to generate the optional LINE rich menu image.
-Pillow>=10.4,<13

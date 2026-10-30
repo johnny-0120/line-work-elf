@@ -1,246 +1,39 @@
-# 公事小精靈｜LINE Work Elf
+# 公事小精靈｜把對話接成下一步
 
-群組聊完了，誰還記得我要做什麼？用 LINE、n8n 與 OpenRouter 免費模型，整理工作訊息、追蹤待回覆，並參考自己的 Obsidian 筆記回答問題。
+每天被工作群洗版，真正需要你處理的事卻找不到？公事小精靈幫你整理討論、找出待回覆，再把確認好的安排接到自己的日曆。
 
-![公事小精靈工具介紹](docs/presentation/slides/01.png)
+[加入 LINE 小精靈](https://line.me/R/ti/p/%40526byspu) · [產品介紹](https://johnny-0120.github.io/line-work-elf/) · [第一次使用教學](https://johnny-0120.github.io/line-work-elf/getting-started.html) · [摘要網頁示範](https://johnny-0120.github.io/line-work-elf/demo.html)
 
-這是可自行部署的個人助理，也能選用多人群組整理模式。部署者準備 LINE 官方帳號與 OpenRouter key，受邀者共用機器人入口，各自綁定群組、各自收到摘要。每人可另外授權自己的日曆，個人記錄與自選的智慧私訊助理也各自隔離，Obsidian 背景工具只供部署者本人使用；本倉庫不包含帳號、訊息、資料庫或筆記。
+![公事小精靈](docs/images/cover.png)
 
-[一般使用者圖文教學](https://johnny-0120.github.io/line-work-elf/getting-started.html) · [功能現況與後續規劃](docs/PRODUCT_PLAN.md) · [Claude 接手說明](CLAUDE.md)
+## 聊完之後，知道下一步
 
-[多人群組整理：加入、隔離與管理方式](docs/multi-user.md)
+- 整理工作討論的重點、決定、待釐清與後續建議。
+- 點開個人摘要網頁，閱讀完整內容、搜尋摘要、查看自己的待辦。
+- 整理結果預設不推播，想收到短提醒可自行開啟。
+- 轉傳或貼上雙人對話，整理你選擇提供的文字。
+- 每人各自開通、綁定工作群、連接自己的 Google Calendar。
+- 智慧私訊可聊天、查自己的資料；行程新增會進入確認流程。
 
-![多人版 LINE 六格功能選單](docs/images/line-menu.png)
+![手機功能選單](docs/images/line-menu.png)
 
-選用多人版時，新朋友加好友會收到引導卡片。按「開始使用」閱讀資料說明，再按鈕開通、複製自己的綁定指令；機器人進群也會提示每位成員各自開通。日常整理、群組列表與設定都能從選單操作。
+## 第一次使用
 
-[10 頁圖文介紹](docs/presentation/README.md) · [使用教學與問題排查](docs/usage.md) · [系統與資料流程](docs/architecture.md) · [下載簡報](https://github.com/johnny-0120/line-work-elf/releases/download/intro-2026-10-23-visual/line-work-elf-illustrated-10pages.pptx)
+1. 加好友，按「開始使用」，閱讀說明後開通自己的空間。
+2. 取得群組成員同意，先把小精靈邀入群。
+3. 由本人按群組歡迎卡片綁定，或在私訊按「綁定工作群」分享至目標群。
+4. 傳新的工作訊息，回私訊按「立即整理」，再開啟自己的摘要網頁。
 
-## 群組聊過的事，整理後接著做
+連結只能短時間使用，持有者可以查看你的內容，請勿轉傳。摘要不會公開上傳到這個網站。
 
-交件期限、改時間與「可以幫忙確認嗎」常出現在不同訊息裡。小精靈接收已綁定工作來源的新文字，整理成公事重點與可能需要回覆的事項，附原文依據讓你核對。每天台北時間 21:00 已設定私訊摘要，也能傳 `/整理` 提前查看。
+## 目前免費試用
 
-![群組原文與整理結果的情境示範](docs/presentation/slides/02.png)
+不需要購買方案或提供信用卡。個人與全站額度、LINE 配額與服務在線狀態會影響可用性。可在使用設定查看用量。現在沒有付款或自動續訂功能。
 
-上圖的對話與輸出是合成示範，沒有使用私人聊天紀錄。待辦完成後可用 `/已處理 編號` 標記；它無法知道你是否已在其他地方回覆。
+這個公開 repo 現在是產品介紹與使用者文件入口。後端程式另行維護，不在目前分支發行；既有公開版本的 Git 歷史仍予以保留。
 
-## 直接說需求，讓它選工具
+## 資料範圍
 
-私訊不用先加「公事：」。工作紀錄、筆記問題與日曆要求會交給對應工具，缺資訊時先追問。Obsidian 採關鍵字搜尋相關 Markdown 片段，回答附筆記名稱與原文，讓問題接得上自己的專案背景。
+只接收機器人已加入且綁定後的新文字，不能自動讀取其他私人聊天室或歷史訊息。每人資料分開保存，服務管理者仍能管理本機檔案。AI 分析會使用外部服務。
 
-![Obsidian 背景問答方式](docs/presentation/slides/07.png)
-
-日曆會區分明確安排與暫定想法。時間不完整就追問，暫定安排先確認，操作後依工具回傳告知結果。目前行程查詢與空閒檢查已驗證，真實新增活動仍待補測。
-
-![明確行程與暫定想法的情境示範](docs/presentation/slides/06.png)
-
-## 部署完成後，先試這一輪
-
-以下是自行部署者的驗收步驟。若你是受邀使用現有機器人的試用者，不用申請 API key，直接依[多人版教學](docs/multi-user.md#試用者怎麼開始)操作。
-
-1. 邀請自己的小精靈加入工作群，私訊 `/綁定群組`，把取得的一次性指令貼進正確群組並依提示啟用。
-2. 群內傳「測試：活動文案週五下午三點交，請我確認場地」，再私訊小精靈 `/整理`。
-3. 核對摘要有沒有保留期限與原文依據，用 `/待回覆` 查看事項，處理好再傳 `/已處理 編號`。
-4. 私訊「今天有什麼行程？」或「參考我的筆記，整理競賽準備重點」，測試已連接的日曆與筆記工具。
-
-![摘要與待回覆的操作方式](docs/presentation/slides/05.png)
-
-群組啟用後的新文字會自動收集，不必逐句加「公事」。私訊也能直接說需求。收到受理訊息後，仍要確認最終摘要或工具結果。[完整教學](docs/usage.md) 包含預期結果與失敗時的檢查方式。
-
-## 能做什麼
-
-- **工作摘要**：收集已綁定、啟用來源的新文字，設定台北時間每天 21:00 私訊摘要，或用 `/整理` 提前執行。
-- **討論內容整理**：即使沒有日期，也按來源與主題說明聊了什麼、方案與理由、明確共識和未解問題；附原文依據。下一步建議另標為 AI 建議，不會自動變成待辦或日曆活動。
-- **待回覆與待辦**：摘要附原文依據，`/待回覆` 查看，`/已處理 編號` 標記完成。不能得知你在其他地方是否已回覆。
-- **自然語言私訊**：不必先打「公事：」。辨識工作、查詢與行程；缺資訊會追問，追問脈絡保留一小時。
-- **Obsidian 背景**：關鍵字搜尋相關 Markdown 片段，回答附筆記名稱與原文。排除私密路徑、日記、封存、模板與明確的私密標記。
-- **Google Calendar**：查行程與空閒時間，依明確要求安排活動。暫定安排先確認，缺少時間不自動補值；尚不支援修改、刪除或週期活動。
-- **本機常駐**：Windows 工作排程器維持服務，處理程序退出、通道網址更新與七天備份。
-
-公開的是自有 Python 程式與 n8n 工作流。n8n 保留 Webhook、摘要排程、AI Agent 與 HTTP 流程；私訊工具、背景檢索、證據檢查與日曆操作在 Python 服務執行。
-
-![系統分工示意](docs/images/architecture.png)
-
-### n8n 與 Agent 怎麼合作
-
-圖中顯示邏輯分工，實際元件與資料位置見[系統說明](docs/architecture.md)。摘要由 n8n AI Agent 處理，私訊工具在 Python 執行，兩者使用同一套工作資料。
-
-## 開始前
-
-目前提供 **Windows 本機部署**，固定使用 n8n `2.43.7`；不自動升級 n8n，也不附 Docker 部署。準備：
-
-1. Python 3.12 或 3.13，含 `python`、`pythonw` 命令。
-2. Node.js 24.x 與 npm。
-3. 自己的 LINE 官方帳號，已啟用 Messaging API。
-4. OpenRouter API key。選用日曆時，另準備 Google Calendar API 的桌面 OAuth 用戶端。
-
-請放在自己的非雲端同步資料夾。一次只運行一套實例；已經有此工具在運行時，不要從另一個目錄重複安裝監控或搶用相同連接埠。
-
-## 安裝
-
-```powershell
-git clone https://github.com/johnny-0120/line-work-elf.git
-cd line-work-elf
-python setup.py
-```
-
-`setup.py` 建立 `.env`，產生隨機內部 token 與 n8n 加密金鑰；已存在的檔案不覆寫。用編輯器填入：
-
-```dotenv
-OPENROUTER_API_KEY=你的OpenRouter金鑰
-LINE_CHANNEL_SECRET=你的ChannelSecret
-LINE_CHANNEL_ACCESS_TOKEN=你的ChannelAccessToken
-LINE_CHANNEL_ID=你的ChannelID
-LINE_OWNER_USER_ID=你的使用者ID
-```
-
-使用者 ID 可在 LINE Developers 的 channel Basic settings 查看 Your user ID。也可等 Webhook 接通後，私訊 `/我的ID` 取得，再填入並重啟。
-
-填好後，先設定你自己的 bot 接收帳號驗證，再安裝服務：
-
-```powershell
-python configure_bot.py
-./install-local.ps1
-```
-
-`configure_bot.py` 向 LINE 取得 bot 身分，寫入本機 `.env` 的 `LINE_BOT_USER_ID`，不顯示識別碼或金鑰。安裝腳本透過 npm 安裝固定版 n8n，匯入工作流和內部憑證，啟動本機服務。
-
-開啟 <http://localhost:5678>，建立自己的 n8n 帳號，檢查「LINE 公事小精靈｜OpenRouter 免費版」並 **Publish／啟用**。憑證如果沒有指派給目前專案，請在 n8n 中重新選取匯入的兩組內部憑證。
-
-| 本機介面 | 位址 |
-|---|---|
-| n8n 編輯器 | `http://localhost:5678` |
-| 小精靈健康檢查 | `http://127.0.0.1:8787/health` |
-| 公開入口 relay 健康檢查 | `http://127.0.0.1:8790/health` |
-| Google Calendar 連線頁 | `http://127.0.0.1:8791` |
-
-核心與離線測試只使用 Python 標準函式庫。若要產生 LINE 六格圖文選單，另安裝 `python -m pip install -r requirements.txt`，再執行 `python rich_menu.py`。圖檔產生使用 Windows 微軟正黑體。
-
-## 接通公開 Webhook
-
-LINE 需要公開 HTTPS 網址。下載官方 [cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/)，將 Windows 執行檔放在：
-
-```text
-%LOCALAPPDATA%\LineWorkElf\bin\cloudflared.exe
-```
-
-執行 `./start-tunnel.ps1`，由 `%LOCALAPPDATA%\LineWorkElf\state\tunnel.log` 取得 HTTPS 基底網址，填入 `.env` 的 `WEBHOOK_URL`，再執行：
-
-```powershell
-./stop-local.ps1 -Service n8n
-./stop-local.ps1 -Service elf
-./start.ps1
-python line_api.py --configure-webhook
-python line_api.py --test-webhook
-```
-
-以上為首次、尚未安裝監控時的設定；只重啟 n8n 與資料服務，保留剛建立的通道。安裝監控後，由監控維持 tunnel 並同步 URL。
-
-在 LINE Developers 開啟 **Use webhook**、**Allow bot to join group chats**；官方帳號管理頁關閉預設自動回覆。Webhook 應為：
-
-```text
-https://你的通道網址/webhook/line-work-elf
-```
-
-通道只能指向 relay `8790`。不要直接公開 n8n 編輯器、`8787` 資料服務或 `8791` OAuth 連線頁。工作流使用正式 `/webhook/`，不要把 `/webhook-test/` 當成日常入口。
-
-## 常駐與重啟
-
-完成 n8n 匯入與發布，確認 `cloudflared.exe` 已放好，再執行：
-
-```powershell
-./install-supervisor.ps1
-```
-
-它註冊 `LINE Work Elf Supervisor` 工作排程器：登入 Windows 後啟動，恢復服務程序、維持通道、同步 LINE endpoint，並備份資料。請回 LINE Developers 確認 Use webhook 已開啟，再執行 `python line_api.py --test-webhook`。
-
-日常使用 `./start.ps1` 啟動；`./stop-local.ps1` 完整停止並停用監控。改 `.env` 後完整停止再啟動，避免監控在修改途中重開服務。不要對同一套已運行的實例反覆執行初次匯入。
-
-電腦必須登入且在線。鎖定畫面可運行；手動睡眠、關機或斷網會中斷服務，離線期間的 LINE 訊息不能保證回補。Quick Tunnel 網址會變動，不是固定網域。
-
-## 開始收集群組
-
-1. 邀請你自己的小精靈進工作群組。
-2. 私訊 `/綁定群組`，取得一次性指令。
-3. 在正確工作群組貼上整行指令，完成來源綁定；再依提示啟用收集。
-4. 群內可用 `/工作群組 專案名稱` 設定名稱；之後的新文字不必逐則加「公事」。
-
-| 指令 | 用途 |
-|---|---|
-| `/整理` | 交給 n8n 整理尚未彙整的公事 |
-| `/待回覆` | 查看待辦與待回覆 |
-| `/已處理 編號` | 標記完成 |
-| `/行程 今天` | 查詢日曆；另支援明天、本週 |
-| `/群組`、`/來源紀錄` | 查看收集來源與事件紀錄 |
-| `/暫停收集`、`/停止收集` | 暫停或停止並清除該來源的本機資料 |
-| `/暫停私訊辨識`、`/恢復私訊辨識` | 控制私訊辨識 |
-| `/重試理解` | 重試未完成的 AI 私訊要求 |
-
-## Obsidian 與日曆（選用）
-
-在 `.env` 填入 `OBSIDIAN_VAULT=你的筆記庫完整路徑` 並重啟。只讀 Markdown，最多掃描 500 篇，取最多四篇相關片段，每篇最多 900 字；不是向量檢索或完整附件閱讀。`private: true`、`#private`、私密路徑與日記等會略過，未標記的私人內容仍可能被搜尋到。
-
-Google Calendar：將自己的桌面 OAuth JSON 存成 `%LOCALAPPDATA%\LineWorkElf\state\google-client.json`，開啟 `http://127.0.0.1:8791` 完成 Google 授權。連線使用 Google Calendar events.owned 與 freebusy 權限，程式目前提供查詢與新增；權限本身較廣，可在 Google 帳戶撤銷。憑證與 refresh token 只留在自己的本機。
-
-如果 Google OAuth 專案是外部「測試」模式，Calendar 授權的 refresh token 通常七天到期；電腦保持開機也無法延長。連線頁會顯示 Google 提供的剩餘期限，失效後提示重新授權。一般的一小時 access token 到期會自動更新；`invalid_grant` 則需要重新開啟連線頁授權。要避免測試模式的七天限制，需在 Google Cloud 完成應用程式設定並轉為正式發布；這不代表應用程式已通過 Google 驗證。參考 [Google 的權杖有效期說明](https://developers.google.com/identity/protocols/oauth2#expiration)。
-
-## 資料、隱私與限制
-
-- LINE 官方 API 無法讀全部個人聊天，也不能自動加入所有群組或回補入群前歷史。群組需逐一邀請且完成綁定。
-- 原文、近期對話與相關筆記片段會送往 OpenRouter 和其模型供應方。私事前綴 `私事`／`#private` 先排除，其餘分類仍可能誤判；使用前應讓工作群組成員了解用途。
-- 目前不讀圖片、語音、附件、記事本與相簿。不自動替你回覆其他人。
-- SQLite 與 OAuth 檔案未額外做應用層加密。原訊息、事件與摘要快照保留七天，待辦三十天；每日備份保留七天，備份也含設定與 OAuth 憑證。
-- 原始資料位於 `%LOCALAPPDATA%\LineWorkElf\state`，設定在 repo 本機 `.env`。`.gitignore` 不會阻止 OneDrive 等同步工具，請自行選擇存放位置。
-- 每批摘要最多 120 則、約 18,000 字，成功後接續下一批。免費 API 可能限流，格式或證據不符時保留請求重試。
-- 對外內部模型名稱固定為 `openrouter/free`；伺服器 `OPENROUTER_FREE_MODEL` 可指定 `:free` 版本，外部呼叫另強制 prompt/completion 最高單價為 0，不接受付費 fallback。這不表示 LINE 推播、主機或其他服務永遠免費。
-- 指定免費版本若回傳 404／410，會重試免費模型路由 `openrouter/free`，保留零價格限制。驗證或權限錯誤不會任意更換模型重試。
-
-## 測試與貢獻
-
-測試不需真實金鑰，也不會呼叫真實 LINE、OpenRouter 或 Google：
-
-```powershell
-$env:LOCALAPPDATA = Join-Path $env:TEMP 'elf-tests'
-$env:ELF_HOME = Join-Path $env:LOCALAPPDATA 'LineWorkElf'
-$env:ELF_STATE_DIR = Join-Path $env:ELF_HOME 'state'
-python -m unittest discover -s . -p 'test_*.py' -q
-```
-
-GitHub Actions 以 Windows／Python 3.12、3.13 執行離線測試與公開檔案掃描。提交前先 `git add`，再執行 `python tools/check_public_files.py`。不要在 issue 附上金鑰、對話、筆記庫、資料庫或 OAuth JSON。詳見 [貢獻方式](CONTRIBUTING.md)。
-
-本專案從個人實作整理而來，功能仍在演進；完整安裝和第三方連線仍需各部署者自行驗證。此公開版只在隔離測試狀態驗證，不附作者的正式執行環境。
-
-## 授權與第三方
-
-本倉庫自有程式與工作流採 [MIT License](LICENSE)。沒有附上 n8n、Node.js、cloudflared 或模型權重；第三方依賴與服務仍依各自授權及條款使用，本倉庫的 MIT 不會變更其授權。n8n 的授權檔請見 [上游 LICENSE.md](https://github.com/n8n-io/n8n/blob/master/LICENSE.md)。
-
-參考：[LINE Messaging API](https://developers.line.biz/en/docs/messaging-api/overview/) · [n8n npm 安裝](https://docs.n8n.io/hosting/installation/npm/) · [OpenRouter](https://openrouter.ai/docs) · [Google Calendar API](https://developers.google.com/workspace/calendar/api/quickstart/python)
-
-
-## 點選就能操作
-
-![手繪淡藍小精靈](assets/avatar.png)
-
-底部選單與卡片使用 LINE 原生按鈕，平常不用記斜線指令。舊指令仍可使用。
-
-- **綁定群組**：先在私訊開通，再邀請小精靈加入工作群，點群內歡迎卡片的「同意並綁定這個群組」。LINE 仍要求使用者自己邀請機器人入群；按鈕不能繞過這一步。找不到卡片時，可用一次性代碼備援。
-- **群組管理**：點「我的群組」選擇來源，即可暫停、恢復或確認解除。只操作自己的綁定。
-- **待回覆**：每項事項都有「已處理這一項」按鈕。
-- **新增行程**：輸入主題，用日期時間選擇器選擇開始與結束時間，再按「確認新增」。實際寫入前仍檢查衝突。
-- **個人日曆**：在「使用設定 → Google Calendar」取得十分鐘有效的個人連線。網頁 OAuth 憑證設定完成後，使用者可登入自己的 Google 帳號；未設定時會明確顯示尚未開放，不會借用管理者的授權。
-
-手機版個人日曆使用另外的 **Web OAuth client**，設定 `GOOGLE_WEB_OAUTH_CLIENT_FILE` 指向本機 Web JSON。回呼網址須與 `member_calendar.CALLBACK` 完全一致。`docs/calendar-connect.html` 與 `docs/calendar-callback.html` 需部署到同一個 HTTPS 網站；更換網站時也要修改程式中的網址。示例目前限制連回 Cloudflare Quick Tunnel，入口重啟後舊連結可能失效，回 LINE 取得新連結即可。正式公開服務建議改用固定網域。
-
-各人日曆 token 存在自己的 SQLite `calendar_tokens` 表，不進入管理者的日曆檔案或摘要提示。解除連線會移除本機 token 並取消尚未執行的日曆要求；Google 帳號中的第三方授權與既有備份需另外處理。一般群組摘要不會主動讀取日曆。
-
-## 第一次使用與私訊處理
-
-[完整圖文教學：從加好友到綁定成功](https://johnny-0120.github.io/line-work-elf/getting-started.html)。小精靈首頁另有六步教學卡片，不必先讀部署文件。
-
-順序是「私訊開通 → 邀請機器人入群 → 本人綁定 → 用新訊息測試」。一個群組最多只能有一個 LINE 官方帳號；加入失敗時先確認這項限制。
-
-部署者自己的普通私訊會理解工作需求，也可自然聊天；私人與閒聊不自動進公事摘要。明確說「幫我記住……」會保存自己的記錄，不自動安排日曆。已保存內容可在「我的記錄」查看、刪除，也可請 Agent 搜尋。
-
-雙人對話使用「整理雙人對話」：轉傳或貼上多段文字，全部送完後按「開始整理這些對話」。先輸出討論重點與後續建議；只有本人按保存或加入待辦才建立對應資料。每次最多三十段、合計一萬二千字。原文與分析暫存二十四小時，明確保存的個人記錄保留三十天，並使用各人的資料庫。一般附件、圖片與語音尚未解析；匯出的聊天文字檔須先開啟，再貼上需要的段落。
-
-這是主動提供選定對話，不能自動訂閱私人帳號的所有雙人聊天室。對話資料不作為工具授權，私人內容也不會自動變成每日工作摘要。
+[隱私權政策](https://johnny-0120.github.io/line-work-elf/privacy.html) · [使用條款](https://johnny-0120.github.io/line-work-elf/terms.html) · [問題回報](https://github.com/johnny-0120/line-work-elf/issues)
