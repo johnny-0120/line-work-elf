@@ -37,3 +37,11 @@
 只接收機器人已加入且綁定後的新文字，不能自動讀取其他私人聊天室或歷史訊息。每人資料分開保存，服務管理者仍能管理本機檔案。AI 分析會使用外部服務。
 
 [隱私權政策](https://johnny-0120.github.io/line-work-elf/privacy.html) · [使用條款](https://johnny-0120.github.io/line-work-elf/terms.html) · [問題回報](https://github.com/johnny-0120/line-work-elf/issues)
+
+## 從對話到任務
+
+已綁定工作群的新文字會分批辨識可能要做的事，附來源原文。你可以接受、略過或延後一天；接受後才建立自己的任務，不會自動新增日曆或通知群友。網頁提供四種狀態的任務看板、手動新增、期限與負責人欄位，以及逐項開啟的到期 LINE 提醒。跨群關鍵字搜尋可找自己仍保留的七天內原文。
+
+[試用合成資料互動示範](https://johnny-0120.github.io/line-work-elf/demo.html) · [看完整操作教學](https://johnny-0120.github.io/line-work-elf/getting-started.html)
+
+AI 建議需核對原文；每人每日最多六批，另受個人與全站配額限制。檔案／語音理解、Notion、Trello、跨人排程與金流目前未提供。
